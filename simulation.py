@@ -25,6 +25,10 @@ class Clock:
         # Today's date as "YYYY-MM-DD".
         return time.strftime("%Y-%m-%d", time.localtime(self.now()))
 
+    def toText(self, seconds):
+        # A time in seconds as "YYYY-MM-DDTHH:MM:SS".
+        return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(seconds))
+
     def skip(self, seconds):
         # Demo only: pretend this much time has passed.
         self.__skippedSeconds = self.__skippedSeconds + seconds
@@ -133,16 +137,15 @@ class Hardware:
 
 
 class MonitoringSystem:
-    """A fake of the other team's system. It only knows the agreed messages, not ADC internals."""
+    """A stand-in for the other team's system, with only what the ADC touches at the boundary.
+    How they store, show or act on our messages belongs to them, so none of that is here."""
 
     __SHARED_KEY = "adc-monitoring-key"     # agreed by both teams
 
     def __init__(self):
         self.__online = True
-        self.__dropNextAck = False
-        self.__received = []                # every message, stored once
-        self.__seenIDs = []                 # used to ignore repeats
         self.__ordersToSend = []
+        self.__commandsToSend = []
         # The pharmacy's authorized orders. These reach the ADC through Transmission.
         self.sendOrder("O1", "P-1001", "LORA", 2)
         self.sendOrder("O2", "P-1001", "ACET", 1000)
@@ -155,48 +158,28 @@ class MonitoringSystem:
         return self.__online
 
     def send(self, message):
-        # Receives a message from the ADC. Returns True if the ADC gets an acknowledgement.
-        if self.__online == False:
-            return False
-        if message["id"] not in self.__seenIDs:     # a repeat is ignored, so no duplicate records
-            self.__seenIDs.append(message["id"])
-            self.__received.append(message)
-        if self.__dropNextAck == True:
-            self.__dropNextAck = False
-            return False
-        return True
+        # One way: the message is handed over and no reply comes back.
+        pass
 
     def getNextOrder(self):
         if self.__online == False or len(self.__ordersToSend) == 0:
             return None
         return self.__ordersToSend.pop(0)
 
+    def getNextCommand(self):
+        if self.__online == False or len(self.__commandsToSend) == 0:
+            return None
+        return self.__commandsToSend.pop(0)
+
     # ----- Demo controls. Only main.py calls these. -----
 
     def toggleLink(self):
         self.__online = not self.__online
 
-    def loseNextAcknowledgement(self):
-        self.__dropNextAck = True
-
     def sendOrder(self, orderID, patientID, drugID, dose):
         order = {"orderID": orderID, "patientID": patientID, "drugID": drugID, "dose": dose}
         self.__ordersToSend.append({"key": self.__SHARED_KEY, "content": order})
 
-    def sendForgedOrder(self):
-        # An order that did not really come from us: the key is wrong.
-        order = {"orderID": "FORGED", "patientID": "P-1001", "drugID": "MORP", "dose": 10}
-        self.__ordersToSend.append({"key": "wrong-key", "content": order})
-
-    def listReceived(self):
-        # Returns one line of text per message received, for main.py to show on the screen.
-        lines = ["Monitoring System has received " + str(len(self.__received)) + " messages:"]
-        for message in self.__received:
-            content = message["content"]
-            if message["type"] == "EVENT":
-                lines.append("  EVENT " + content["type"] + " " + content["user"] + " " + content["details"])
-            elif message["type"] == "FAULT_RESOLVED":
-                lines.append("  FAULT_RESOLVED " + content["faultID"])
-            else:
-                lines.append("  " + message["type"] + " " + content["id"] + " " + content["faultType"] + " on " + content["component"])
-        return lines
+    def sendCommand(self, command):
+        # command is "FREEZE" or "SHUTDOWN".
+        self.__commandsToSend.append({"key": self.__SHARED_KEY, "content": command})

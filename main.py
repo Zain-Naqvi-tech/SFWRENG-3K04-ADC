@@ -100,11 +100,35 @@ def main():
     running = True
 
     while running:
-        # ---------- The monitoring cycle: check the hardware, retry unsent messages ----------
+        # ---------- The monitoring cycle. In the window, this runs at least once a second. ----------
         # FR-ALM-01, NFR-COM-01: a fault is found here and its alarm is sent right away.
         adc["mode"].completeStartup(adc["faults"].checkHardwareStatus())
-        if adc["transmission"].synchronizePendingMessages() == "partial_success":
-            adc["logger"].logEvent("SYNC_FAILED", "SYSTEM", "will retry")
+
+        # Every hour, all logged events go to the Monitoring System. No reply comes back.
+        if adc["logger"].sendHourlyLog() == "sent":
+            screen.showMessage("--- Hourly log for the Monitoring System ---")
+
+        # Send anything still waiting (FR-COM-01), then show what went out.
+        adc["transmission"].synchronizePendingMessages()
+        for text in adc["transmission"].takeSentMessages():
+            screen.showMessage(text)
+            screen.showMessage("SENT")
+
+        # A FREEZE or SHUTDOWN command from the Monitoring System.
+        command = adc["transmission"].receiveCommand()
+        if command == "FREEZE":
+            adc["logger"].logEvent("FREEZE_RECEIVED", "MONITORING", "")
+            adc["mode"].freeze()
+            for drawerID in adc["drawer"].listDrawers():
+                adc["drawer"].lockDrawer(drawerID)
+            screen.showAlert("FREEZE command received from the Monitoring System. Cabinet frozen.")
+        elif command == "SHUTDOWN":
+            adc["logger"].logEvent("SHUTDOWN_RECEIVED", "MONITORING", "")
+            screen.showAlert("SHUTDOWN command received from the Monitoring System. Shutting down.")
+            screen.getChoice("Shutdown command received:", {"0": "Close"})
+            break
+        elif command == "rejected":
+            adc["logger"].logEvent("MESSAGE_REJECTED", "SYSTEM", "invalid command")
 
         # ---------- Show the current state (US-STAT-01) ----------
         identity = adc["auth"].getUserIdentity(session)
@@ -122,7 +146,10 @@ def main():
         screen.showMenu()
         choice = screen.getInput("> ")
 
-        if choice == "0":
+        if choice == "":            # a second passed with no click, so just run the cycle again
+            pass
+
+        elif choice == "0":
             running = False
 
         # ---------- What a user does at the cabinet ----------
@@ -236,9 +263,8 @@ def main():
             monitoring.toggleLink()
             screen.showMessage("Network is now up: " + str(monitoring.isOnline()))
 
-        elif choice == "21":        # The message arrives but its acknowledgement is lost (US-COM-01)
-            monitoring.loseNextAcknowledgement()
-            screen.showMessage("The next acknowledgement will be lost.")
+        elif choice == "21":        # The Monitoring System tells the cabinet to freeze
+            monitoring.sendCommand("FREEZE")
 
         elif choice == "22":        # The Monitoring System sends a new authorized order
             orderID = screen.getInput("Order ID: ")
@@ -247,13 +273,12 @@ def main():
             dose = screen.getNumber("Dose (mg): ")
             monitoring.sendOrder(orderID, patientID, drugID, dose)
 
-        elif choice == "23":        # A forged order with the wrong key (NFR-COM-02)
-            monitoring.sendForgedOrder()
-            screen.showMessage("Forged order sent. It is checked at the next dispense request.")
+        elif choice == "23":        # The Monitoring System tells the cabinet to shut down
+            monitoring.sendCommand("SHUTDOWN")
 
-        elif choice == "24":        # What the other team's system can see
-            for line in monitoring.listReceived():
-                screen.showMessage(line)
+        elif choice == "24":        # Hourly log without waiting an hour
+            clock.skip(3600)
+            screen.showMessage("1 hour has passed.")
 
         elif choice == "25":        # Hardware fault: a lock stops responding (Scenario 3)
             drawerID = screen.getInput("Drawer (D1-D4): ")

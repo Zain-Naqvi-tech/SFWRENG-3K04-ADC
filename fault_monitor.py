@@ -7,7 +7,8 @@ ANTICIPATED CHANGE: A new fault type or a different priority. Only __FAULT_TYPES
 EXPORTED OPERATIONS: checkHardwareStatus, reportFault, resolveFault, getActiveFaults
 USES: Authenticator, Drawer, Sensor, Operational Mode, EventLogger, Transmission, Storage, Clock.
 
-A Fault given to callers is: {"id", "faultType", "severity", "component", "description", "detectedAt"}.
+A Fault given to callers is: {"id", "faultType", "severity", "category", "component", "drawer",
+"description", "detectedAt"}. The category is "electrical", "mechanical" or "software" (US-FD-01).
 """
 
 
@@ -15,13 +16,13 @@ class FaultMonitor:
     """STATE INVARIANT: every active CRITICAL fault means the cabinet is in the safe state,
     including after a restart, so restarting cannot clear it (D1 decision 1)."""
 
-    # The secret: every fault type and its priority. CRITICAL means safe state.
+    # The secret: every fault type, its priority and its category. CRITICAL means safe state.
     __FAULT_TYPES = {
-        "DRAWER_NOT_SECURED": "CRITICAL",
-        "LOCK_FAILURE": "CRITICAL",
-        "HARDWARE_UNRESPONSIVE": "CRITICAL",
-        "INVENTORY_CORRUPT": "CRITICAL",
-        "POWER_FAILURE": "MAJOR",       # D1 assumption 3: power reserves keep the cabinet running
+        "DRAWER_NOT_SECURED": {"severity": "CRITICAL", "category": "mechanical"},
+        "LOCK_FAILURE": {"severity": "CRITICAL", "category": "mechanical"},
+        "HARDWARE_UNRESPONSIVE": {"severity": "CRITICAL", "category": "electrical"},
+        "INVENTORY_CORRUPT": {"severity": "CRITICAL", "category": "software"},
+        "POWER_FAILURE": {"severity": "MAJOR", "category": "electrical"},   # D1 assumption 3: reserves keep it running
     }
     __DRAWER_TIME_LIMIT = 30            # seconds a drawer may stay open or unlocked (FR-ALM-02)
     __POWER_SENSOR = "POWER"
@@ -91,8 +92,12 @@ class FaultMonitor:
 
         faultID = "F-" + str(self.__nextID)
         self.__nextID = self.__nextID + 1
-        fault = {"id": faultID, "faultType": faultType, "severity": self.__FAULT_TYPES[faultType],
-                 "component": component, "description": description, "detectedAt": self.__clock.now()}
+        drawerID = None
+        if component in self.__drawer.listDrawers():
+            drawerID = component
+        fault = {"id": faultID, "faultType": faultType, "severity": self.__FAULT_TYPES[faultType]["severity"],
+                 "category": self.__FAULT_TYPES[faultType]["category"], "component": component, "drawer": drawerID,
+                 "description": description, "detectedAt": self.__clock.now()}
         self.__faults[faultID] = fault
         self.__save()
         self.__logger.logEvent("FAULT_DETECTED", "SYSTEM", faultID + " " + faultType + " on " + component)
@@ -122,11 +127,14 @@ class FaultMonitor:
         if self.__detectFault(component) != "no_fault":
             return "rejected"           # a fault cannot be marked resolved without verification
 
+        resolved = self.__faults[faultID]
         del self.__faults[faultID]
         self.__save()
         user = self.__auth.getUserIdentity(sessionId)
         self.__logger.logEvent("FAULT_RESOLVED", user["id"], faultID)
-        self.__transmission.sendMessage("FAULT_RESOLVED", {"faultID": faultID, "verifiedAt": self.__clock.now()})
+        resolved["resolvedBy"] = user["id"]
+        resolved["verifiedAt"] = self.__clock.now()
+        self.__transmission.sendMessage("FAULT_RESOLVED", resolved)
         return "resolved"
 
     def getActiveFaults(self):

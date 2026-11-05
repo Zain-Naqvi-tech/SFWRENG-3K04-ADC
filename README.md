@@ -1,159 +1,292 @@
-<<<<<<< HEAD
 # ADC demo (Sub-team 78)
 
-Run from inside `adc_simple`:
+Software implementation of an ADC (Automated Dispensing Cabinet) for use in hospital environments.
+
+## Start it
+
+Open a terminal in this folder and run the command below. Do this before the TAs arrive, and leave the window open.
 
 ```bash
 python main.py
 ```
 
-This opens the ADC window. To use the terminal version instead, change the import in `main.py` to `from display_terminal import Display`. Nothing else changes.
+Every start resets the cabinet, so the demo always begins the same way.
 
-| Badge / PIN | Role | Can do |
+## How to use the window
+
+- **Blue buttons** are what a person does at the cabinet.
+- **Grey buttons** make something happen for the demo, like breaking a lock. They need no login.
+- **Every button shows its requirement IDs.** "New requirement" means it has no ID in D1 yet.
+- **The bottom bar** is where you answer questions: type and press Enter, or click a purple button.
+- **The numbered buttons don't respond** while the bottom bar is waiting for an answer. Answer it first.
+- **Logging in** automatically logs out whoever was logged in before.
+
+## Logins
+
+| Role | Badge | PIN |
 |---|---|---|
-| N001 / 1111 | Nurse | dispense, view inventory |
-| C001 / 2222 | Charge nurse | also override |
-| P001 / 3333 | Pharmacist | restock |
-| T001 / 4444 | Technician | maintenance, resolve faults, resume |
-| A001 / 5555 | Admin | logs, unlock accounts |
+| Nurse | `N001` | `1111` |
+| Charge nurse | `C001` | `2222` |
+| Pharmacist | `P001` | `3333` |
+| Technician | `T001` | `4444` |
+| Admin | `A001` | `5555` |
 
-Orders: `P-1001` LORA 2, ACET 1000. `P-1002` AMOX 500, MORP 10 (batch 1050 is expired).
+## Who can do what
 
-## Try these
+| Action | Nurse | Charge nurse | Pharmacist | Technician | Admin |
+|---|---|---|---|---|---|
+| 3 - Dispense | Yes | Yes | No | No | No |
+| 4 - Restock | No | No | Yes | No | No |
+| 5 - Emergency override | No | Yes | No | No | No |
+| 6 - View inventory | Yes | Yes | Yes | Yes | No |
+| 7 - Resolve fault | No | No | No | Yes | No |
+| 8 - Resume normal | No | No | No | Yes | No |
+| 9 - Maintenance on/off | No | No | No | Yes | No |
+| 10 - View logs | No | No | No | No | Yes |
+| 11 - Verify logs | No | No | No | No | Yes |
+| 12 - Unlock account | No | No | No | No | Yes |
 
-The numbers are the numbered buttons. Anything else is typed into the box at the bottom. After a dispense or override, the numbered `1` to `5` below are the purple buttons, in order.
+A denied attempt is refused and flagged in the log.
 
-| Scenario | Keys |
-|---|---|
-| Dispense | `1` N001 1111, `3` P-1001 LORA 2, `1` |
-| Wrong dose | `3` P-1001 ACET 5 |
-| Expired | `3` P-1002 MORP 10 |
-| Nurse tries override | `5` ACET CODE_BLUE |
-| Drawer left open (alarm, safe state) | `3` P-1002 AMOX 500, `2` |
-| Show the alarm reached Monitoring | `24` |
-| Fix it | `1` T001 4444, `7` F-1 (rejected), `28`, `7` F-1 (resolved), `8` |
-| Network loss, then back | `20`, do anything, `20` |
-| Restock | `1` P001 3333, `4` LORA 2000 2099-01-01 10 |
-| Override | `1` C001 2222, `5` ACET CODE_BLUE, `1` |
-| Tampered log | `1` A001 5555, `32`, `11` |
-| Broken lock or sensor | `25` D2, or `26` D2 |
-| Power failure (keeps running) | `27` |
-| Maintenance | `1` T001 4444, `9` |
-| Session timeout | log in, `29` |
-| Lockout | `1` with a wrong PIN, 4 times |
-| Restart keeps data | `30` |
-| Corrupt inventory (do this last, then re-run the program) | `31` |
-| New or forged order | `22`, or `23` then any dispense then `24` |
+## What each mode allows
 
-## How the code follows Weeks 5 and 6
+The top bar shows the mode. Even with the right role, the mode can refuse an action.
 
-| Course rule | In the code |
-|---|---|
-| One module = one file, named for the module | Each file below has one class, and starts with its responsibility, secret and anticipated change |
-| "The exported operations are the module's public methods. Everything else is private." | Each file has a PUBLIC INTERFACE section and a PRIVATE section |
-| "A public field is a leaked secret." | Every field in every class is `self.__name` |
-| A secret is "private fields and constants" | PINs, permissions, fault types, time limits and tables are `__private` class constants |
-| Public methods have pre/post in the doc comment | Every public method has a PRE and POST |
-| State invariant: set by the constructor, kept by every public method | Stated at the top of each class |
-| USES: references the class holds, injected, acyclic | `startSystem` in `main.py` |
-| Hardware modules have a simulated implementation behind the same interface | `Hardware` in `simulation.py`, reached only by Actuator and Sensor |
-| Invalid state change means "no change plus a log entry" | `OperationalMode.__changeMode` |
-| Partner protocol is a secret inside one comms module | Message format and key are inside Transmission |
-
-## Module interfaces
-
-| Module (file) | Secret | Public operation: called by | Private |
+| Mode | Dispense | Restock | Emergency override |
 |---|---|---|---|
-| Authenticator (`authenticator.py`) | How credentials are verified, the users, sessions | `authenticate`, `logout`, `unlockAccount`: main. `getUserIdentity`: Dispensing, Fault Monitor, Override, main. `isAuthorized`: Dispensing, Inventory, Fault Monitor, Mode, Override, main | `__checkCredentials`, `__validateSession`, `__recordActivity` |
-| Dispensing (`dispensing.py`) | Dispensing rules, orders, open requests | `requestDispense`, `completeDispense`, `cancelDispense`: main. `releaseForOverride`: Override | `__validateRequest`, `__stockProblem`, `__openDrawer`, `__receiveNewOrders`, `__hasOrder`, `__setOrderStatus`, `__userOf`, `__reject` |
-| Inventory Manager (`inventory_manager.py`) | Data structure, how batches are chosen | `getInventory`, `startReplenish`, `finishReplenish`: main. `checkDispensable`, `removeMedication`: Dispensing | `__restoreInventory`, `__checkRestock`, `__addMedication`, `__getQuantity`, `__getNextBatch`, `__checkExpiry`, `__findBatch`, `__saveChange` |
-| EventLogger (`event_logger.py`) | Log format, checksum | `logEvent`: most modules. `getEventHistory`, `getUserEvents`, `verifyLogIntegrity`: main | `__restoreLogs`, `__readRecords`, `__toEvent`, `__checksum` |
-| Fault Monitor (`fault_monitor.py`) | Fault types, priorities, thresholds, detection | `checkHardwareStatus`, `resolveFault`: main. `reportFault`: Dispensing, Inventory. `getActiveFaults`: Dispensing, main | `__detectFault`, `__hasFaultOn`, `__hasCriticalFault`, `__lockAllDrawers`, `__save` |
-| Operational Mode (`operational_mode.py`) | Modes, transitions, what each permits | `getCurrentMode`, `setMode`, `resumeNormalOperation`, `completeStartup`: main. `enterSafeState`: Fault Monitor. `checkOperationAllowed`: Dispensing, Inventory | `__changeMode` |
-| Transmission (`transmission.py`) | Message format, key, acks, retries, queue | `sendMessage`: EventLogger, Fault Monitor. `receiveMessage`: Dispensing. `checkConnection`, `synchronizePendingMessages`, `getPendingCount`: main | `__queueMessage`, `__acknowledgeMessage`, `__save` |
-| Actuator (`actuator.py`) | How locks are commanded and confirmed | `unlockActuator`, `lockActuator`, `getActuatorStatus`: Drawer | `__sendCommand` |
-| Sensor (`sensor.py`) | How readings are collected, valid ranges | `readSensor`: Drawer, Fault Monitor | `__isValid` |
-| Drawer (`drawer.py`) | Which lock and sensors belong to each drawer | `listDrawers`, `getDrawerStatus`: Fault Monitor, main. `getDrawerContents`, `unlockDrawer`: Dispensing, Inventory. `lockDrawer`: Dispensing, Inventory, Fault Monitor | fields only |
-| Override (`override.py`) | Override rules, approved reasons | `requestOverride`: main | `__verifyAuthorization`, `__recordOverride` |
-| Display (`display.py`, or `display_terminal.py`) | Layout, wording, how input is collected | All 10 operations: main | How the window is built and how input is collected |
+| Operational (green) | Yes | Yes | Yes |
+| Under Maintenance (amber) | No | Yes | No |
+| SAFE STATE (red) | No | No | Yes, except on a drawer with a fault |
+| Status Unknown (grey) | No | No | No |
+| FROZEN (dark blue) | No | No | No |
 
-Helper files, not modules: `main.py` (connects everything and runs the loop), `simulation.py` (fake clock, cabinet and Monitoring System), `storage.py` (saves to files).
+## What's in the cabinet
 
-## USES (no cycles)
+| Patient | Drug | Dose (mg) | Drawer | Stock | Note |
+|---|---|---|---|---|---|
+| `P-1001` | `LORA` Lorazepam | `2` | D1 | 20 | |
+| `P-1001` | `ACET` Acetaminophen | `1000` | D2 | 30 | |
+| `P-1002` | `AMOX` Amoxicillin | `500` | D3 | 15 | |
+| `P-1002` | `MORP` Morphine | `10` | D4 | 5 | Always expired (batch 1050) |
 
-```
-main      -> Display, and the modules below (Actuator and Sensor are not reachable from the loop)
-Override     -> Dispensing, Authenticator, EventLogger
-Dispensing   -> Inventory, Drawer, Mode, Fault Monitor, Authenticator, EventLogger, Transmission
-Inventory    -> Fault Monitor, Drawer, Mode, Authenticator, EventLogger
-Fault Monitor-> Mode, Drawer, Sensor, Authenticator, EventLogger, Transmission
-Mode         -> Authenticator, EventLogger
-Authenticator-> EventLogger
-EventLogger  -> Transmission
-Drawer       -> Actuator, Sensor
-```
+Each order can only be dispensed once. Re-run the program to get them all back.
 
-Three calls in the doc would create cycles, so they go the other way:
-- Drawer does not report to Fault Monitor. Fault Monitor checks Drawer.
-- Operational Mode does not ask Fault Monitor. The hardware verdict is passed in as a parameter.
-- Dispensing does not ask Override. Override calls Dispensing, which re-checks authorization itself.
+## How we talk to the Monitoring System
 
-## Change drill (Week 6: "which module changes, and what does not?")
-
-| TA says | What changes | Interface change? |
+| What | When | Reply from them? |
 |---|---|---|
-| "Switch to a different sensor" | `sensor.py` only | No |
-| "Different lock model" | `actuator.py` only | No |
-| "Fingerprint instead of PIN" | `authenticator.py` `__checkCredentials`, and the prompt in `display.py` | No |
-| "Session timeout is 2 minutes" | `authenticator.py` `__TIMEOUT_SECONDS` | No |
-| "Dispensing allowed in maintenance" | `operational_mode.py` `__PERMITTED` | No |
-| "Allow a 10% dose tolerance" | `dispensing.py` `__validateRequest` | No |
-| "Six drawers" | `NUMBER_OF_DRAWERS` in `main.py`, and stock in `inventory_manager.py` | No |
-| "Add a temperature fault" | `sensor.py` `__LIMITS`, `fault_monitor.py` `__FAULT_TYPES` and `__detectFault` (cross-cutting) | No |
-| "Move logs to a database" | `storage.py` only | No |
-| "Use a different screen" | `display.py` only, or one import line to switch to `display_terminal.py` | No |
-| "New message format" | `transmission.py` only, agreed with the Monitoring team | External interface only |
+| Every logged event, including all attempts | Every hour | None |
+| Malfunction and maintenance request | As soon as the fault is found | None |
+| Malfunction resolved | As soon as it's verified | None |
+| Authorized orders, from them to us | When they send one | None |
+| FREEZE command, from them to us | When they send one | We freeze |
+| SHUTDOWN command, from them to us | When they send one | We shut down |
 
-After any change, update that requirement's row in the traceability table and re-run its scenario above.
+Everything we send is shown in the Activity panel in their format, followed by `SENT`. If the network is down, it waits and goes out when the network returns.
 
-## Update the D2 doc to match
+## The demo
 
-| Module | Doc says | Code does |
-|---|---|---|
-| Authenticator | exports validateSession, recordActivity | private |
-| | exports isAuthenticated(userID, sessionID) | replaced by `isAuthorized(sessionId, action)` |
-| | | adds `unlockAccount(sessionId, badge)` |
-| Dispensing | exports validateRequest | private |
-| | | adds `releaseForOverride(sessionId, drugID)` |
-| | "Change:" is blank | a dispensing rule changes, e.g. a dose tolerance |
-| Inventory | exports getMedication, getQuantity, checkExpiry, addMedication, restoreInventory | removed or private; callers use `checkDispensable(drugID)` and `getInventory(sessionId)` |
-| | | adds `startReplenish`, `finishReplenish` |
-| EventLogger | exports restoreLogs | private |
-| | "Requester unauthorized: access_denied" | the caller checks VIEW_LOGS |
-| Fault Monitor | exports detectFault | private |
-| | reportFault(fault), resolveFault(faultID) | `reportFault(faultType, component, description)`, `resolveFault(sessionId, faultID)` |
-| | checkHardwareStatus "normal" | also requires no open critical fault |
-| Operational Mode | setMode(newMode), resumeNormalOperation() | `setMode(sessionId, newMode)`, NORMAL and MAINTENANCE only; `resumeNormalOperation(sessionId, hardwareStatus)` |
-| | | adds `completeStartup(hardwareStatus)` |
-| Transmission | exports queueMessage, acknowledgeMessage | private; adds `getPendingCount()` |
-| | sendMessage(message) | `sendMessage(messageType, content)` |
-| Sensor | no operations listed; status and health rows | `readSensor(sensorID)` only; delete those rows |
-| Drawer | no operations listed; contents return MedicationList | list the 5 above; contents return an item count |
-| Actuator | also lists ActuatorUnresponsive, InvalidCommand, HardwareConnectionFailure | verdicts are ActuatorNotFound, ActuatorFailure, and `unknown` for no response |
-| Override | requestOverride(personnelID, reason), verifyAuthorization, recordOverride | `requestOverride(sessionId, drugID, reason)`; the other two are private |
-| Display | refers to an ADC Controller, uses most modules | no controller: `main.py` runs the loop and Display uses nothing; list the 10 operations (including `getChoice`) |
-| Precise spec table | FR-AUT-01 | D1's ID is FR-AUTH-01 |
+Run these in order from a fresh start, and the fault numbers will match. If you jump around, use the fault number shown on screen.
 
-## Known limits (say these before a TA finds them)
+**Short on time?** Do demos 1, 3 and 4. They cover authenticate, dispense and log, plus a hardware fault and a dropped connection.
 
-- The Monitoring System is a fake in the same program. Part B integration is not done.
-- NFR-COM-02: a shared key stands in for the authenticated, encrypted connection. There is no real encryption.
-- PINs are plain text, and the log checksum is a simple one.
-- Fault checks run each time the screen refreshes, not on a timer.
-- Modes are plain strings in a transition table. Week 6 suggests an enum, which we skipped to keep it simple.
-- Python's `__private` blocks normal access, but `obj._Class__name` could still get in. No module does this.
-- The destructors print to the terminal that started the program, not to the window, so keep it visible if you want to show them on a restart.
-=======
-# SFWRENG-3K04-ADC
-Software implementation of and ADC (Automated Dispensing Cabinet) for use in hospital environments.
->>>>>>> 9d4985100b75cddab2ff34cdae427ad56c073900
+### Demo 1: Normal dispense (Nurse)
+
+Handout scenario 1. FR-AUTH-01, FR-DSP-01, FR-LOG-01.
+
+| Do this | You should see |
+|---|---|
+| **1 - Log in**: `N001`, `1111` | User: Nina Patel (NURSE) |
+| **3 - Dispense**: `P-1001`, `LORA`, `2` | "drawer D1 is unlocked", and purple buttons appear |
+| **Take dose and close** | "Dispense complete", and D1 is LOCKED |
+| **6 - View inventory** | LORA quantity went from 20 to 19 |
+| **24 - Skip 1 hour** | "Hourly log", then each event in their format with `SENT`, including `dispense_completed`. The session also ends, since an hour passed |
+
+### Demo 2: Requests that get refused (Nurse)
+
+FR-DSP-01, FR-DSP-02, NFR-AUT-01, NFR-AUT-04. Every drawer stays locked.
+
+| Do this | You should see |
+|---|---|
+| **1 - Log in**: `N001`, `1111` | User: Nina Patel (NURSE) |
+| **3 - Dispense**: `P-1001`, `ACET`, `5` | "Dose Mismatch" |
+| **3 - Dispense**: `P-1002`, `MORP`, `10` | "batch 1050 is expired" |
+| **3 - Dispense**: `P-1001`, `LORA`, `2` | "already been dispensed" |
+| **3 - Dispense**: `P-1001`, `AMOX`, `500` | "no authorized order" |
+| **5 - Emergency override**: `ACET`, `CODE_BLUE` | "You are not authorized to override" |
+| **4 - Restock**: `LORA`, `2000`, `2099-01-01`, `10` | "you may not restock" |
+
+### Demo 3: Hardware fault, drawer left open (Nurse, then Technician)
+
+Handout scenario 3. FR-ALM-01, FR-ALM-02, FR-COM-02, NFR-FD-01, NFR-FD-02, US-FD-02.
+
+| Do this | You should see |
+|---|---|
+| **3 - Dispense**: `P-1002`, `AMOX`, `500` | D3 is unlocked |
+| **Take dose, leave drawer open** | Top bar turns red, SAFE STATE, D3 is OPEN, F-1 is listed, "Dispense NOT confirmed". Activity shows `malfunction` and `maintenance_request`, each with `SENT` |
+| **3 - Dispense**: `P-1001`, `ACET`, `1000` | "not permitted in the current mode" |
+| **1 - Log in**: `T001`, `4444` | User: Tom Reid (TECHNICIAN) |
+| **7 - Resolve fault**: `F-1` | "Resolve: rejected", because it isn't fixed yet |
+| **28 - Repair all** | D3 is LOCKED, still SAFE STATE |
+| **8 - Resume normal** | "Resume: rejected", because F-1 is still open |
+| **7 - Resolve fault**: `F-1` | "Resolve: resolved", and `malfunction_resolved` with `SENT` |
+| **8 - Resume normal** | "Resume: normal_mode", and the top bar is green |
+
+### Demo 4: Connection lost, restock still works (Pharmacist)
+
+Handout scenarios 2 and 4. FR-COM-01, NFR-FD-03, US-INV-01.
+
+| Do this | You should see |
+|---|---|
+| **20 - Network down/up** | Monitoring: disconnected |
+| **1 - Log in**: `P001`, `3333` | User: Priya Shah (PHARMACIST) |
+| **4 - Restock**: `LORA`, `2000`, `2099-01-01`, `10` | "count increased by 10", "Saved locally" |
+| **6 - View inventory** | LORA now also has batch 2000 with quantity 10 |
+| **24 - Skip 1 hour** | "Hourly log", but nothing says `SENT`. Messages waiting goes above 0 |
+| **20 - Network down/up** | Monitoring: connected, 0 messages waiting, and the waiting events appear with `SENT`, including `restock` |
+
+### Demo 5: Emergency override (Charge nurse)
+
+US-AUT-02, NFR-SEC-01.
+
+| Do this | You should see |
+|---|---|
+| **1 - Log in**: `C001`, `2222` | User: Carlos Diaz (CHARGE_NURSE) |
+| **5 - Emergency override**: `ACET`, `convenience` | "not an approved emergency reason" |
+| **5 - Emergency override**: `MORP`, `CODE_BLUE` | "batch 1050 is expired", because an override can't release expired stock |
+| **5 - Emergency override**: `ACET`, `CODE_BLUE` | "OVERRIDE approved and logged", D2 unlocks |
+| **Take dose and close** | "Dispense complete" |
+
+### Demo 6: Logs (Nurse is refused, then Admin)
+
+FR-LOG-01, NFR-AUT-03, US-LOG-02.
+
+| Do this | You should see |
+|---|---|
+| **1 - Log in**: `N001`, `1111` | User: Nina Patel (NURSE) |
+| **10 - View logs** | "Access denied" |
+| **1 - Log in**: `A001`, `5555` | User: Alex Kim (ADMIN) |
+| **10 - View logs**: leave it blank and press Enter | The full history, with times and users |
+| **10 - View logs**: `C001` | Only the charge nurse's events, including OVERRIDE_APPROVED |
+| **11 - Verify logs** | "Log integrity: valid" |
+| **32 - Tamper log** | "Log file edited directly" |
+| **11 - Verify logs** | "Log integrity: invalid" |
+
+### Demo 7: Maintenance (Technician, then Nurse)
+
+US-STAT-01.
+
+| Do this | You should see |
+|---|---|
+| **1 - Log in**: `T001`, `4444` | User: Tom Reid (TECHNICIAN) |
+| **9 - Maintenance on/off** | Top bar turns amber, Under Maintenance |
+| **1 - Log in**: `N001`, `1111` | User: Nina Patel (NURSE) |
+| **3 - Dispense**: `P-1001`, `ACET`, `1000` | "not permitted in the current mode" |
+| **1 - Log in**: `T001`, `4444` | User: Tom Reid (TECHNICIAN) |
+| **9 - Maintenance on/off** | Top bar is green, Operational |
+
+### Demo 8: Other hardware faults (Technician)
+
+FR-ALM-02, NFR-FD-01, NFR-FD-02. Stay logged in as the technician, except for the jammed lock.
+
+| Do this | You should see |
+|---|---|
+| **25 - Break a lock**: `D2` | SAFE STATE, D2 is UNKNOWN, F-2 is listed |
+| **28 - Repair all**, then **7 - Resolve fault**: `F-2`, then **8 - Resume normal** | Back to Operational |
+| **26 - Break a sensor**: `D3` | SAFE STATE, D3 is UNKNOWN, F-3 is listed |
+| **28 - Repair all**, then **7 - Resolve fault**: `F-3`, then **8 - Resume normal** | Back to Operational |
+| **27 - Power failure** | F-4 MAJOR is listed, but it stays Operational. Activity shows `"malfunction_type": "electrical"` with `SENT` |
+| **28 - Repair all**, then **7 - Resolve fault**: `F-4` | F-4 is gone |
+| **1 - Log in**: `N001`, `1111`, then **3 - Dispense**: `P-1001`, `ACET`, `1000` | D2 is unlocked |
+| **Take dose and close, but the lock jams** | SAFE STATE, D2 is UNLOCKED, F-5 LOCK_FAILURE is listed |
+| **1 - Log in**: `T001`, `4444`, then **28 - Repair all**, then **7 - Resolve fault**: `F-5`, then **8 - Resume normal** | Back to Operational |
+
+If the jammed lock stays unfixed for more than 30 seconds, a second fault (F-6) appears by itself. Resolve it too before resuming.
+
+### Demo 9: Session timeout and lockout (Nurse, then Admin)
+
+NFR-AUT-02, US-AUT-01, US-AUT-04.
+
+| Do this | You should see |
+|---|---|
+| **1 - Log in**: `N001`, `1111` | User: Nina Patel (NURSE) |
+| **29 - Skip 3 minutes** | "Session ended after 3 minutes of inactivity", not logged in |
+| **1 - Log in**: `N001`, `0000`, three times | "Invalid credentials" each time |
+| **1 - Log in**: `N001`, `0000`, a fourth time | "Account Temporarily Locked" |
+| **1 - Log in**: `N001`, `1111` | Still locked, even with the right PIN. This 5th attempt also flags a breach in the log |
+| **1 - Log in**: `A001`, `5555`, then **12 - Unlock account**: `N001` | "Unlock: success" |
+| **1 - Log in**: `N001`, `1111` | "Welcome" |
+
+### Demo 10: New order from the Monitoring System (Nurse)
+
+FR-DSP-01.
+
+| Do this | You should see |
+|---|---|
+| **22 - New order**: `O9`, `P-2000`, `AMOX`, `500` | Nothing yet. It's picked up at the next dispense |
+| **3 - Dispense**: `P-2000`, `AMOX`, `500`, then **Take dose and close** | "Dispense complete", so the new order worked |
+
+### Demo 11: Freeze command from the Monitoring System
+
+New requirement.
+
+| Do this | You should see |
+|---|---|
+| **21 - Monitoring: Freeze** | Top bar turns dark blue, FROZEN, "FREEZE command received" |
+| **3 - Dispense**: `P-1001`, `LORA`, `2` | "not permitted in the current mode" |
+| **1 - Log in**: `C001`, `2222`, then **5 - Emergency override**: `ACET`, `CODE_BLUE` | "not permitted in the current mode", so even an override is refused |
+| **1 - Log in**: `T001`, `4444`, then **8 - Resume normal** | "Resume: rejected" |
+| **30 - Restart software** | Back to Operational. A restart is the only way out of a freeze |
+
+### Demo 12: Restart and corrupted inventory
+
+NFR-FD-03, US-FD-03.
+
+| Do this | You should see |
+|---|---|
+| **1 - Log in**: `N001`, `1111`, then **6 - View inventory** | The quantities from earlier are still there after the restart |
+| **31 - Corrupt inventory** | SAFE STATE, INVENTORY_CORRUPT is listed |
+| **1 - Log in**: `N001`, `1111`, then **6 - View inventory** | "Inventory information is unavailable" |
+| **3 - Dispense**: `P-1001`, `LORA`, `2` | "not permitted in the current mode" |
+
+A corrupted inventory can't be fixed from the menu. Click **0 - Exit** and run `python main.py` again.
+
+### Demo 13: Shutdown command from the Monitoring System (after re-running)
+
+New requirement.
+
+| Do this | You should see |
+|---|---|
+| **23 - Monitoring: Shutdown** | "SHUTDOWN command received", and a **Close** button |
+| **Close** | The window closes. The shutdown messages appear in the terminal, including "drawers locked" |
+
+## If something looks wrong
+
+| What happened | Why, and what to do |
+|---|---|
+| Numbered buttons don't respond | The bottom bar is waiting for an answer. Answer it first |
+| "already been dispensed" | Each order works once. Re-run the program |
+| "Access denied" or "you may not" | Wrong role for that action. Check the "Who can do what" table |
+| "not permitted in the current mode" | The mode is refusing it. Check the top bar |
+| "Resume: rejected" | Log in as the technician, click **28 - Repair all**, resolve every listed fault, then resume |
+| FROZEN won't go away | Only **30 - Restart software** clears it |
+
+## Say these before a TA finds them
+
+- The Monitoring System is a fake inside this program. Integration with Part B isn't done.
+- The cabinet hardware is simulated, in `simulation.py`.
+- A shared key stands in for the authenticated, encrypted connection, so there's no real encryption (NFR-COM-02).
+- PINs are stored as plain text.
+- The hourly log and fault checks run on a timer only in the window. The terminal version waits for you to press Enter.
+
+## Using the terminal instead
+
+If the window has a problem, change this line in `main.py` and run it again. Nothing else needs to change:
+
+```python
+from display_terminal import Display
+```
+
+## More detail
+
+[DESIGN_NOTES.md](DESIGN_NOTES.md) has the module interfaces, USES hierarchy, change drill and the list of D2 doc updates.

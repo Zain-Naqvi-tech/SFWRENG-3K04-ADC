@@ -90,7 +90,8 @@ class Dispensing:
         if locked != "locked" or taken != 1:
             self.__logger.logEvent("DISPENSE_FAILED", request["user"], request["drugID"])
             return "failed"
-        self.__logger.logEvent("DISPENSE_COMPLETED", request["user"], requestID + " " + request["drugID"])
+        self.__logger.logEvent("DISPENSE_COMPLETED", request["user"], requestID + " " + request["drugID"],
+                               {"drawer": drawerID, "drug": request["drugID"], "amount": 1})
         return "completed"
 
     def cancelDispense(self, requestID):

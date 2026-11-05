@@ -22,32 +22,41 @@ class Display:
         "MAINTENANCE": "Under Maintenance",
         "SAFE": "SAFE STATE - not functioning normally",
         "UNKNOWN": "Status Unknown",
+        "FROZEN": "FROZEN by the Monitoring System",
     }
 
     # Colour always comes with text, so the screen does not rely on colour alone (accessibility).
-    __MODE_COLOURS = {"NORMAL": "#1e7d45", "MAINTENANCE": "#b7791f", "SAFE": "#c0392b", "UNKNOWN": "#5b6470"}
+    __MODE_COLOURS = {"NORMAL": "#1e7d45", "MAINTENANCE": "#b7791f", "SAFE": "#c0392b", "UNKNOWN": "#5b6470",
+                      "FROZEN": "#2c4a6e"}
     __DRAWER_COLOURS = {"locked": "#1e7d45", "unlocked": "#b7791f", "open": "#c0392b", "unknown": "#5b6470"}
     __BACKGROUND = "#eef1f4"
     __USER_BUTTON = "#1f5f99"
     __DEMO_BUTTON = "#5b6470"
     __CHOICE_BUTTON = "#7a4fa3"
 
-    # The buttons. Each key is the choice main.py receives when the button is clicked.
+    # The buttons, with the requirements each one shows. Each key is the choice main.py receives.
     __USER_ACTIONS = {
-        "1": "Log in", "2": "Log out", "3": "Dispense", "4": "Restock",
-        "5": "Emergency override", "6": "View inventory", "7": "Resolve fault", "8": "Resume normal",
-        "9": "Maintenance on/off", "10": "View logs", "11": "Verify logs", "12": "Unlock account",
+        "1": "Log in\nFR-AUTH-01", "2": "Log out\nFR-AUTH-01",
+        "3": "Dispense\nFR-DSP-01, FR-DSP-02", "4": "Restock\nUS-INV-01, NFR-AUT-01",
+        "5": "Emergency override\nNFR-SEC-01, US-AUT-02", "6": "View inventory\nFR-INV-01",
+        "7": "Resolve fault\nFR-COM-02", "8": "Resume normal\nUS-FD-02",
+        "9": "Maintenance on/off\nUS-STAT-01", "10": "View logs\nFR-LOG-01",
+        "11": "Verify logs\nNFR-AUT-03", "12": "Unlock account\nUS-AUT-01",
     }
     __DEMO_ACTIONS = {
-        "20": "Network down/up", "21": "Lose next ack", "22": "New order", "23": "Forged order",
-        "24": "Show what Monitoring received", "25": "Break a lock", "26": "Break a sensor",
-        "27": "Power failure", "28": "Repair all", "29": "Skip 3 minutes", "30": "Restart software",
-        "31": "Corrupt inventory", "32": "Tamper log", "33": "Close a drawer", "0": "Exit",
+        "20": "Network down/up\nFR-COM-01", "21": "Monitoring: Freeze\nNew requirement",
+        "22": "New order\nFR-DSP-01", "23": "Monitoring: Shutdown\nNew requirement",
+        "24": "Skip 1 hour\nFR-LOG-01", "25": "Break a lock\nFR-ALM-02, NFR-FD-01",
+        "26": "Break a sensor\nFR-ALM-02, NFR-FD-01", "27": "Power failure\nFR-ALM-02, US-FD-01",
+        "28": "Repair all\nUS-FD-02", "29": "Skip 3 minutes\nNFR-AUT-02",
+        "30": "Restart software\nNFR-FD-03", "31": "Corrupt inventory\nUS-FD-03",
+        "32": "Tamper log\nUS-LOG-02", "33": "Close a drawer\nFR-ALM-02", "0": "Exit",
     }
 
     def __init__(self):
         self.__menuOpen = False     # True when the next getInput should wait for a menu button
         self.__closed = False       # True once the window has been closed
+        self.__menuEnabled = False  # True while the menu buttons can be clicked
         self.__menuButtons = []
         self.__drawerCards = {}     # drawer ID -> its widgets, created the first time we see it
 
@@ -80,6 +89,7 @@ class Display:
         colour = self.__MODE_COLOURS[mode]
         self.__banner.config(bg=colour)
         self.__modeLabel.config(text=self.__STATUS_TEXT[mode], bg=colour)
+        self.__modeRequirement.config(bg=colour)
         self.__linkLabel.config(text="Monitoring: " + connection + "  |  " + str(pending) + " messages waiting", bg=colour)
         self.__userLabel.config(text="User: " + user, bg=colour)
 
@@ -89,7 +99,7 @@ class Display:
             self.__updateDrawerCard(drawerID, drawers[drawerID])
 
         if len(faults) == 0:
-            self.__faultLabel.config(text="No active faults", fg=self.__MODE_COLOURS["NORMAL"])
+            self.__faultLabel.config(text="No active faults  (FR-ALM-01, FR-ALM-02)", fg=self.__MODE_COLOURS["NORMAL"])
         else:
             text = ""
             for fault in faults:
@@ -132,7 +142,8 @@ class Display:
         self.__write("\n", "normal")
 
     def getInput(self, prompt):
-        """Returns the menu button clicked if showMenu was just called. Otherwise returns what the user typed."""
+        """Returns the menu button clicked if showMenu was just called, or "" if a second passes with
+        no click, so the loop in main.py keeps running. Otherwise returns what the user typed."""
         if self.__menuOpen == True:
             self.__menuOpen = False
             return self.__waitForMenuButton()
@@ -172,11 +183,13 @@ class Display:
         self.__banner.grid(row=0, column=0, columnspan=2, sticky="ew")
         self.__banner.columnconfigure(0, weight=1)
         self.__modeLabel = tk.Label(self.__banner, fg="white", font=("Segoe UI", 20, "bold"))
-        self.__modeLabel.grid(row=0, column=0, rowspan=2, sticky="w")
+        self.__modeLabel.grid(row=0, column=0, rowspan=3, sticky="w")
         self.__linkLabel = tk.Label(self.__banner, fg="white", font=("Segoe UI", 10))
         self.__linkLabel.grid(row=0, column=1, sticky="e")
         self.__userLabel = tk.Label(self.__banner, fg="white", font=("Segoe UI", 10, "bold"))
         self.__userLabel.grid(row=1, column=1, sticky="e")
+        self.__modeRequirement = tk.Label(self.__banner, text="US-STAT-01, NFR-FD-01", fg="white", font=("Segoe UI", 8))
+        self.__modeRequirement.grid(row=2, column=1, sticky="e")
 
     def __buildDrawerRow(self):
         # Row 1: one card per drawer. The cards are added by showStatus.
@@ -220,7 +233,7 @@ class Display:
         for key in actions:
             button = self.__makeButton(group, key + " - " + actions[key], key, colour)
             button.config(width=19, state="disabled")
-            button.grid(row=position // 3, column=position % 3, padx=2, pady=2, sticky="nsew")
+            button.grid(row=position // 4, column=position % 4, padx=2, pady=2, sticky="nsew")
             self.__menuButtons.append(button)
             position = position + 1
 
@@ -228,9 +241,9 @@ class Display:
         # Clicking the button gives main.py the same key it would get from typing it.
         def clicked():
             self.__answer.set(key)
-        return tk.Button(parent, text=text, command=clicked, bg=colour, fg="white", wraplength=140, relief="flat",
+        return tk.Button(parent, text=text, command=clicked, bg=colour, fg="white", wraplength=150, relief="flat",
                          activebackground=colour, activeforeground="white", disabledforeground="#c9d1d9",
-                         font=("Segoe UI", 9), padx=4, pady=4)
+                         font=("Segoe UI", 9), padx=2, pady=2)
 
     def __buildActivity(self):
         # Row 3, right side: every message, alert and table appears here.
@@ -238,8 +251,8 @@ class Display:
         panel.grid(row=3, column=1, sticky="nsew")
         panel.rowconfigure(1, weight=1)
         panel.columnconfigure(0, weight=1)
-        tk.Label(panel, text="Activity", bg=self.__BACKGROUND, font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
-        self.__activity = tk.Text(panel, wrap="word", state="disabled", font=("Consolas", 10), bg="white", relief="flat", padx=8, pady=6)
+        tk.Label(panel, text="Activity  (FR-LOG-01, NFR-FD-04)", bg=self.__BACKGROUND, font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
+        self.__activity = tk.Text(panel, width=40, height=8, wrap="word", state="disabled", font=("Consolas", 10), bg="white", relief="flat", padx=8, pady=6)
         self.__activity.grid(row=1, column=0, sticky="nsew")
         scrollbar = tk.Scrollbar(panel, command=self.__activity.yview)
         scrollbar.grid(row=1, column=1, sticky="ns")
@@ -264,10 +277,20 @@ class Display:
 
     def __waitForMenuButton(self):
         self.__promptLabel.config(text="Choose an action")
-        self.__setMenuButtons("normal")
+        if self.__menuEnabled == False:
+            self.__setMenuButtons("normal")
+            self.__menuEnabled = True
+        # If nobody clicks within a second, return "" so main.py can run its monitoring cycle again.
+        timer = self.__window.after(1000, self.__oneSecondPassed)
         answer = self.__waitForAnswer()
-        self.__setMenuButtons("disabled")
+        self.__window.after_cancel(timer)
+        if answer != "":
+            self.__setMenuButtons("disabled")
+            self.__menuEnabled = False
         return answer
+
+    def __oneSecondPassed(self):
+        self.__answer.set("")
 
     def __setMenuButtons(self, state):
         for button in self.__menuButtons:

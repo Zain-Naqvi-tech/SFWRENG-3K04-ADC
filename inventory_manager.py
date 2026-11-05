@@ -92,11 +92,12 @@ class InventoryManager:
         if amount <= 0 or amount > self.__getQuantity(drugID):
             return "rejected"
         removed = 0
+        batch = None
         while removed < amount:
             batch = self.__getNextBatch(drugID)
             batch["quantity"] = batch["quantity"] - 1
             removed = removed + 1
-        self.__saveChange(drugID, "removed " + str(amount))
+        self.__saveChange("INVENTORY_REMOVED", "SYSTEM", drugID, "removed", batch, amount)
         return "allowed"
 
     def startReplenish(self, sessionId, drugID, batchID, amount, expiryDate):
@@ -141,7 +142,11 @@ class InventoryManager:
         count = self.__drawer.getDrawerContents(job["drawer"])
         if count != job["startCount"] + job["amount"]:
             return "failed"
-        self.__addMedication(job["drugID"], job["batchID"], job["amount"], job["expiry"])
+        identity = self.__auth.getUserIdentity(sessionId)
+        user = "SYSTEM"
+        if identity != "rejected":
+            user = identity["id"]
+        self.__addMedication(user, job["drugID"], job["batchID"], job["amount"], job["expiry"])
         return "success"
 
     # ================ PRIVATE (the secret: the data structure and how batches are chosen) ================
@@ -179,14 +184,15 @@ class InventoryManager:
             return "Expiry date must be YYYY-MM-DD."
         return ""
 
-    def __addMedication(self, drugID, batchID, amount, expiryDate):
+    def __addMedication(self, user, drugID, batchID, amount, expiryDate):
         # Private, so stock can only be added after authorization and sensor confirmation.
         batch = self.__findBatch(batchID)
         if batch == None:
-            self.__items[drugID]["batches"].append({"batch": batchID, "quantity": amount, "expiry": expiryDate})
+            batch = {"batch": batchID, "quantity": amount, "expiry": expiryDate}
+            self.__items[drugID]["batches"].append(batch)
         else:
             batch["quantity"] = batch["quantity"] + amount
-        self.__saveChange(drugID, "added " + str(amount))
+        self.__saveChange("RESTOCK", user, drugID, "added", batch, amount)
 
     def __getQuantity(self, drugID):
         total = 0
@@ -221,6 +227,9 @@ class InventoryManager:
                     return batch
         return None
 
-    def __saveChange(self, drugID, change):
+    def __saveChange(self, eventType, user, drugID, change, batch, amount):
         self.__storage.save("inventory", self.__items)
-        self.__logger.logEvent("INVENTORY_CHANGED", "SYSTEM", drugID + " " + change + ", now " + str(self.__getQuantity(drugID)))
+        details = drugID + " " + change + " " + str(amount) + ", now " + str(self.__getQuantity(drugID))
+        extra = {"drawer": self.__items[drugID]["drawer"], "drug": self.__items[drugID]["name"],
+                 "batch": batch["batch"], "amount": amount, "expiry": batch["expiry"]}
+        self.__logger.logEvent(eventType, user, details, extra)

@@ -1,26 +1,30 @@
 """
 EVENTLOGGER MODULE
 
-RESPONSIBILITY: Keep a traceable history of ADC activity and make it available to the Monitoring System.
-SECRET: The log format, timestamps, and the checksum that exposes tampering.
-ANTICIPATED CHANGE: A better logging system or different log fields. Only this file changes.
-EXPORTED OPERATIONS: logEvent, getEventHistory, getUserEvents, verifyLogIntegrity
+RESPONSIBILITY: Keep a traceable history of ADC activity and send it to the Monitoring System every hour.
+SECRET: The log format, timestamps, the checksum that exposes tampering, and how often logs are sent.
+ANTICIPATED CHANGE: A better logging system, different log fields, or a different send interval. Only this file changes.
+EXPORTED OPERATIONS: logEvent, getEventHistory, getUserEvents, verifyLogIntegrity, sendHourlyLog
 USES: Transmission, Storage, Clock.
 
 There is deliberately NO edit or delete operation (NFR-AUT-03). Records are never removed,
 so the seven-day retention always holds (US-LOG-01).
 
-An Event given to callers is: {"seq", "time", "type", "user", "details"}. The checksum is never exposed.
+An Event given to callers is: {"seq", "time", "type", "user", "details", "extra"}. The checksum is never exposed.
 """
 
 
 class EventLogger:
-    """STATE INVARIANT: each saved record's checksum includes the checksum of the record before it."""
+    """STATE INVARIANT: each saved record's checksum includes the checksum of the record before it,
+    and each record is sent to the Monitoring System only once."""
+
+    __SEND_INTERVAL_SECONDS = 3600      # every hour
 
     def __init__(self, transmission, clock, storage):
         self.__transmission = transmission
         self.__clock = clock
         self.__storage = storage
+        self.__lastSendTime = self.__clock.now()
         self.__restoreLogs()
 
     def __del__(self):
@@ -28,25 +32,43 @@ class EventLogger:
 
     # ================ PUBLIC INTERFACE ================
 
-    def logEvent(self, eventType, user, details):
+    def logEvent(self, eventType, user, details, extra=None):
         """
-        PRE:  none.
-        POST: "success"  - saved locally, with a timestamp, and handed to Transmission (FR-LOG-01).
+        PRE:  extra, if given, holds any of: "mode", "drawer", "drug", "batch", "amount", "expiry".
+        POST: "success"  - saved locally with a timestamp, and sent with the next hourly log (FR-LOG-01).
               "rejected" - the event has no type. Nothing changes.
         """
         if eventType == "":
             return "rejected"
+        if extra == None:
+            extra = {}
         records = self.__readRecords()
         previousCheck = 0
         if len(records) > 0:
             previousCheck = records[len(records) - 1]["check"]
         record = {"seq": len(records), "time": self.__clock.now(), "type": eventType,
-                  "user": user, "details": details}
+                  "user": user, "details": details, "extra": extra, "sent": False}
         record["check"] = self.__checksum(record, previousCheck)
         records.append(record)
         self.__storage.save("log", records)
-        self.__transmission.sendMessage("EVENT", self.__toEvent(record))
         return "success"
+
+    def sendHourlyLog(self):
+        """
+        PRE:  none.
+        POST: "sent"    - an hour has passed, and every event not sent yet went to Transmission.
+              "not_due" - less than an hour has passed. Nothing changes.
+        """
+        if self.__clock.now() - self.__lastSendTime < self.__SEND_INTERVAL_SECONDS:
+            return "not_due"
+        self.__lastSendTime = self.__clock.now()
+        records = self.__readRecords()
+        for record in records:
+            if record["sent"] == False:
+                self.__transmission.sendMessage("EVENT", self.__toEvent(record))
+                record["sent"] = True
+        self.__storage.save("log", records)
+        return "sent"
 
     def getEventHistory(self, startTime, endTime):
         """
@@ -80,7 +102,7 @@ class EventLogger:
         PRE:  none.
         POST: "valid"   - every record matches its checksum.
               "invalid" - at least one does not. The bad records are flagged in a new
-                          event and sent to the Monitoring System (US-LOG-02).
+                          event, which goes out with the next hourly log (US-LOG-02).
         """
         badRecords = []
         previousCheck = 0
@@ -112,7 +134,7 @@ class EventLogger:
     def __toEvent(self, record):
         # Callers get a copy without the checksum, so the internal record stays hidden.
         return {"seq": record["seq"], "time": record["time"], "type": record["type"],
-                "user": record["user"], "details": record["details"]}
+                "user": record["user"], "details": record["details"], "extra": record["extra"]}
 
     def __checksum(self, record, previousCheck):
         # Each checksum includes the one before it, so the records are chained together.

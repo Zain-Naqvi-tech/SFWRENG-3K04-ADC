@@ -5,7 +5,7 @@ RESPONSIBILITY: Hold the cabinet's mode and decide which operations each mode pe
 SECRET: The modes, the allowed changes between them, and what each mode permits.
 ANTICIPATED CHANGE: A new mode, or a mode permitting different operations. Only the two tables change.
 EXPORTED OPERATIONS: getCurrentMode, setMode, enterSafeState, checkOperationAllowed,
-                     resumeNormalOperation, completeStartup
+                     resumeNormalOperation, completeStartup, freeze
 USES: Authenticator, EventLogger.
 
 This is our D1 state machine at the cabinet level. Every transition is one line in __ALLOWED_CHANGES.
@@ -24,14 +24,16 @@ class OperationalMode:
         "NORMAL": ["DISPENSE", "REPLENISH", "OVERRIDE"],
         "MAINTENANCE": ["REPLENISH"],
         "SAFE": ["OVERRIDE"],       # US-AUT-02: emergency access when the cabinet has malfunctioned
+        "FROZEN": [],               # the Monitoring System froze the cabinet: nothing is permitted
     }
 
     # The transition table: which mode may change to which.
     __ALLOWED_CHANGES = {
-        "UNKNOWN": ["NORMAL", "SAFE"],
-        "NORMAL": ["MAINTENANCE", "SAFE"],
-        "MAINTENANCE": ["NORMAL", "SAFE"],
-        "SAFE": ["NORMAL"],
+        "UNKNOWN": ["NORMAL", "SAFE", "FROZEN"],
+        "NORMAL": ["MAINTENANCE", "SAFE", "FROZEN"],
+        "MAINTENANCE": ["NORMAL", "SAFE", "FROZEN"],
+        "SAFE": ["NORMAL", "FROZEN"],
+        "FROZEN": [],
     }
 
     def __init__(self, auth, logger):
@@ -44,7 +46,7 @@ class OperationalMode:
     def getCurrentMode(self):
         """
         PRE:  none.
-        POST: "UNKNOWN", "NORMAL", "MAINTENANCE" or "SAFE". Nothing changes.
+        POST: "UNKNOWN", "NORMAL", "MAINTENANCE", "SAFE" or "FROZEN". Nothing changes.
         """
         return self.__mode
 
@@ -66,14 +68,22 @@ class OperationalMode:
     def enterSafeState(self, faultID):
         """
         PRE:  Fault Monitor has recorded this fault.
-        POST: "safe_mode" - the mode is SAFE (NFR-FD-01).
+        POST: "safe_mode" - the mode is SAFE (NFR-FD-01), or stays FROZEN, which already permits nothing.
               "rejected"  - there is no fault ID. The mode is unchanged.
         """
         if faultID == "":
             return "rejected"
-        if self.__mode != "SAFE":
+        if self.__mode != "SAFE" and self.__mode != "FROZEN":
             self.__changeMode("SAFE")
         return "safe_mode"
+
+    def freeze(self):
+        """
+        PRE:  the Monitoring System sent an authenticated FREEZE command.
+        POST: the mode is FROZEN and nothing is permitted. It stays frozen until the software restarts.
+        """
+        if self.__mode != "FROZEN":
+            self.__changeMode("FROZEN")
 
     def checkOperationAllowed(self, action):
         """
@@ -114,6 +124,6 @@ class OperationalMode:
         if newMode not in self.__ALLOWED_CHANGES[self.__mode]:
             self.__logger.logEvent("MODE_CHANGE_REJECTED", "SYSTEM", self.__mode + " -> " + newMode)
             return "rejected"
-        self.__logger.logEvent("MODE_CHANGED", "SYSTEM", self.__mode + " -> " + newMode)
+        self.__logger.logEvent("MODE_CHANGED", "SYSTEM", self.__mode + " -> " + newMode, {"mode": newMode})
         self.__mode = newMode
         return "success"

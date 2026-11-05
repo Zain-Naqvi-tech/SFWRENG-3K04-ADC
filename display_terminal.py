@@ -23,6 +23,7 @@ class Display:
         "MAINTENANCE": "Under Maintenance",
         "SAFE": "SAFE STATE - not functioning normally",
         "UNKNOWN": "Status Unknown",
+        "FROZEN": "FROZEN by the Monitoring System",
     }
 
     # ================ PUBLIC INTERFACE (called by main.py) ================
@@ -40,16 +41,23 @@ class Display:
     def showMenu(self):
         """Shows what the user can do, and what we can make happen for the demo."""
         print()
-        print("[1 - Log in]             [2 - Log out]         [3 - Dispense]         [4 - Restock]")
-        print("[5 - Emergency override] [6 - View inventory]  [7 - Resolve fault]    [8 - Resume normal]")
-        print("[9 - Maintenance on/off] [10 - View logs]      [11 - Verify logs]     [12 - Unlock account]")
+        print("[1 - Log in] FR-AUTH-01               [2 - Log out] FR-AUTH-01")
+        print("[3 - Dispense] FR-DSP-01, FR-DSP-02   [4 - Restock] US-INV-01, NFR-AUT-01")
+        print("[5 - Emergency override] NFR-SEC-01   [6 - View inventory] FR-INV-01")
+        print("[7 - Resolve fault] FR-COM-02         [8 - Resume normal] US-FD-02")
+        print("[9 - Maintenance on/off] US-STAT-01   [10 - View logs] FR-LOG-01")
+        print("[11 - Verify logs] NFR-AUT-03         [12 - Unlock account] US-AUT-01")
         print(" ")
         print("--- Make something happen (for the demo) ---")
         print(" ")
-        print("[20 - Network down/up]   [21 - Lose next ack]  [22 - New order]       [23 - Forged order]")
-        print("[24 - Show what Monitoring received]       [25 - Break a lock]    [26 - Break a sensor]")
-        print("[27 - Power failure]     [28 - Repair all]     [29 - Skip 3 minutes]  [30 - Restart software]")
-        print("[31 - Corrupt inventory] [32 - Tamper log]     [33 - Close a drawer]  [0 - Exit]")
+        print("[20 - Network down/up] FR-COM-01      [21 - Monitoring: Freeze] New requirement")
+        print("[22 - New order] FR-DSP-01            [23 - Monitoring: Shutdown] New requirement")
+        print("[24 - Skip 1 hour] FR-LOG-01          [25 - Break a lock] FR-ALM-02")
+        print("[26 - Break a sensor] FR-ALM-02       [27 - Power failure] FR-ALM-02, US-FD-01")
+        print("[28 - Repair all] US-FD-02            [29 - Skip 3 minutes] NFR-AUT-02")
+        print("[30 - Restart software] NFR-FD-03     [31 - Corrupt inventory] US-FD-03")
+        print("[32 - Tamper log] US-LOG-02           [33 - Close a drawer] FR-ALM-02")
+        print("[0 - Exit]")
 
     def showMessage(self, text):
         """Shows a normal message (NFR-FD-04: acknowledges an operation)."""
