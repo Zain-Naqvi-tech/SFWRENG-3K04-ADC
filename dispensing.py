@@ -4,18 +4,19 @@ DISPENSING MODULE
 RESPONSIBILITY: Check dispense requests against authorized orders and coordinate the correct drawer.
 SECRET: The dispensing rules, and how orders and open requests are tracked.
 ANTICIPATED CHANGE: A dispensing rule changes (e.g. a dose tolerance). Only __validateRequest changes.
-EXPORTED OPERATIONS: requestDispense, completeDispense, cancelDispense, releaseForOverride
+EXPORTED OPERATIONS: requestDispense, completeDispense, cancelDispense, releaseForOverride, getUserOrders
 USES: Authenticator, Inventory Manager, Drawer, Operational Mode, Fault Monitor, EventLogger,
-      Transmission, Storage.
+      Transmission, Storage, Clock.
 
 ASSUMPTION: drawers hold pre-packaged doses, so one dispense removes exactly one unit.
 """
 
 
 class Dispensing:
-    """STATE INVARIANT: an order is dispensed at most once, and a drawer is only unlocked for an open request."""
+    """STATE INVARIANT: an order is dispensed at most once and never after it expires, and a drawer
+    is only unlocked for an open request."""
 
-    def __init__(self, auth, inventory, drawer, mode, faults, logger, transmission, storage):
+    def __init__(self, auth, inventory, drawer, mode, faults, logger, transmission, storage, clock):
         self.__auth = auth
         self.__inventory = inventory
         self.__drawer = drawer
@@ -24,7 +25,9 @@ class Dispensing:
         self.__logger = logger
         self.__transmission = transmission
         self.__storage = storage
+        self.__clock = clock
         self.__requests = {}        # request ID -> open or closed request
+        self.__requestHistory = []  # every dispense request since the last restart, allowed or refused
         self.__nextID = 1
         self.__orders = []          # authorized orders (m_dispenseAuthorization)
         saved = self.__storage.load("orders")
@@ -36,22 +39,45 @@ class Dispensing:
 
     def requestDispense(self, sessionId, patientID, drugID, dose):
         """
+        This is authorizingDispense() from our precise specification.
         PRE:  none. Everything is checked here (FR-DSP-01, FR-DSP-02, NFR-AUT-01).
         POST: {"verdict": "allowed", "requestID": id, "drawer": id} - only that drawer is unlocked.
               {"verdict": "rejected", "reason": text} - every drawer stays locked, and the attempt is logged.
         """
         self.__receiveNewOrders()
         user = self.__userOf(sessionId)
-        # Check 1: is this person allowed? (D1 decision 4: two checks before a drawer opens)
+        result = self.__checkAndOpen(sessionId, user, patientID, drugID, dose)
+        reason = ""
+        if result["verdict"] == "rejected":
+            reason = result["reason"]
+        self.__requestHistory.append({"user": user, "patientID": patientID, "drugID": drugID, "dose": dose,
+                                      "verdict": result["verdict"], "reason": reason})
+        return result
+
+    def getUserOrders(self, sessionId):
+        """
+        PRE:  none.
+        POST: {"orders": [...], "requests": [...]} for a user who may dispense. Nothing is dispensed.
+              Each order is {"orderID", "patientID", "drugID", "dose", "expiry", "validity"}, where
+              validity is "valid" or why it cannot be dispensed.
+              Each request is one this user made since the last restart, valid or not:
+              {"patientID", "drugID", "dose", "verdict", "reason"}.
+              "denied" - the user may not dispense.
+        """
+        self.__receiveNewOrders()
         if self.__auth.isAuthorized(sessionId, "DISPENSE") == False:
-            return self.__reject(user, drugID, "Access denied: you may not dispense medication.")
-        if self.__mode.checkOperationAllowed("DISPENSE") == False:
-            return self.__reject(user, drugID, "Dispensing is not permitted in the current mode.")
-        # Check 2: is this request allowed?
-        result = self.__validateRequest(patientID, drugID, dose)
-        if result["verdict"] == "invalid":
-            return self.__reject(user, drugID, result["reason"])
-        return self.__openDrawer(sessionId, user, drugID, result["order"])
+            return "denied"
+        user = self.__userOf(sessionId)
+        orders = []
+        for order in self.__orders:
+            orders.append({"orderID": order["orderID"], "patientID": order["patientID"], "drugID": order["drugID"],
+                           "dose": order["dose"], "expiry": order["expiry"], "validity": self.__orderValidity(order)})
+        requests = []
+        for request in self.__requestHistory:
+            if request["user"] == user:
+                requests.append({"patientID": request["patientID"], "drugID": request["drugID"], "dose": request["dose"],
+                                 "verdict": request["verdict"], "reason": request["reason"]})
+        return {"orders": orders, "requests": requests}
 
     def completeDispense(self, requestID):
         """
@@ -140,6 +166,18 @@ class Dispensing:
 
     # ================ PRIVATE (the secret: the dispensing rules) ================
 
+    def __checkAndOpen(self, sessionId, user, patientID, drugID, dose):
+        # Check 1: is this person allowed? (D1 decision 4: two checks before a drawer opens)
+        if self.__auth.isAuthorized(sessionId, "DISPENSE") == False:
+            return self.__reject(user, drugID, "Access denied: you may not dispense medication.")
+        if self.__mode.checkOperationAllowed("DISPENSE") == False:
+            return self.__reject(user, drugID, "Dispensing is not permitted in the current mode.")
+        # Check 2: is this request allowed?
+        result = self.__validateRequest(patientID, drugID, dose)
+        if result["verdict"] == "invalid":
+            return self.__reject(user, drugID, result["reason"])
+        return self.__openDrawer(sessionId, user, drugID, result["order"])
+
     def __validateRequest(self, patientID, drugID, dose):
         # Private, so a request can never be validated without the authorization and mode checks.
         # Returns {"verdict": "valid", "order": order} or {"verdict": "invalid", "reason": text}.
@@ -150,17 +188,48 @@ class Dispensing:
             return {"verdict": "invalid", "reason": "Requested dose is invalid."}
 
         foundOrder = False
+        expiredOrder = None
         for order in self.__orders:
             if order["patientID"] == patientID and order["drugID"] == drugID:
                 foundOrder = True
                 if order["status"] == "ACTIVE":
-                    if order["dose"] == dose:
+                    if self.__orderExpired(order):
+                        expiredOrder = order
+                    elif order["dose"] == dose:
                         return {"verdict": "valid", "order": order}
-                    return {"verdict": "invalid", "reason": "ERROR: Dose Mismatch. Requested " + str(dose)
-                            + " mg does not match the authorized " + str(order["dose"]) + " mg. Access Denied."}
+                    else:
+                        return {"verdict": "invalid", "reason": "ERROR: Dose Mismatch. Requested " + str(dose)
+                                + " mg does not match the authorized " + str(order["dose"]) + " mg. Access Denied."}
+        if expiredOrder != None:
+            return {"verdict": "invalid", "reason": "This order expired on " + expiredOrder["expiry"] + ". Access Denied."}
         if foundOrder:
             return {"verdict": "invalid", "reason": "This order has already been dispensed."}
         return {"verdict": "invalid", "reason": "Access Denied: no authorized order for this patient and medication."}
+
+    def __orderExpired(self, order):
+        # An order may be used up to and including its expiry date.
+        return order["expiry"] < self.__clock.today()
+
+    def __orderValidity(self, order):
+        # Returns "valid", or why this order cannot be dispensed right now.
+        if order["status"] == "DISPENSED":
+            return "already dispensed"
+        if order["status"] == "IN_PROGRESS":
+            return "in progress"
+        if self.__orderExpired(order):
+            return "order expired"
+        verdict = self.__inventory.checkDispensable(order["drugID"])["verdict"]
+        if verdict == "available":
+            return "valid"
+        if verdict == "expired":
+            return "medication expired"
+        if verdict == "out_of_stock":
+            return "out of stock"
+        if verdict == "MedicationNotFound":
+            return "medication not in cabinet"
+        if verdict == "location_unconfirmed":
+            return "compartment unconfirmed"
+        return "inventory unavailable"
 
     def __stockProblem(self, drugID):
         # Returns what stops this medication being dispensed, or "" if nothing does.
@@ -202,7 +271,8 @@ class Dispensing:
                 self.__logger.logEvent("MESSAGE_REJECTED", "SYSTEM", "invalid key")
             elif self.__hasOrder(message["orderID"]) == False:      # ignore duplicates
                 self.__orders.append({"orderID": message["orderID"], "patientID": message["patientID"],
-                                      "drugID": message["drugID"], "dose": message["dose"], "status": "ACTIVE"})
+                                      "drugID": message["drugID"], "dose": message["dose"],
+                                      "expiry": message["expiry"], "status": "ACTIVE"})
                 self.__storage.save("orders", self.__orders)
                 self.__logger.logEvent("ORDER_RECEIVED", "SYSTEM", message["orderID"])
             message = self.__transmission.receiveMessage()

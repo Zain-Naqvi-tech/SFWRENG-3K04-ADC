@@ -40,7 +40,7 @@ def startSystem(hardware, monitoring, clock, storage):
     mode = OperationalMode(auth, logger)
     faults = FaultMonitor(auth, drawer, sensor, mode, logger, transmission, storage, clock)
     inventory = InventoryManager(auth, mode, drawer, faults, logger, storage, clock)
-    dispensing = Dispensing(auth, inventory, drawer, mode, faults, logger, transmission, storage)
+    dispensing = Dispensing(auth, inventory, drawer, mode, faults, logger, transmission, storage, clock)
     override = Override(auth, dispensing, logger)
     logger.verifyLogIntegrity()
 
@@ -136,7 +136,8 @@ def main():
         if identity != "rejected":
             user = identity["name"] + " (" + identity["role"] + ")"
         elif session != None:
-            screen.showAlert("Session ended after 3 minutes of inactivity.")    # NFR-AUT-02
+            # NFR-AUT-02: 3 minutes of inactivity. handleFault: a critical fault also ends every session.
+            screen.showAlert("Session ended, by 3 minutes of inactivity or a critical fault. Please log in again.")
             session = None
         drawers = {}
         for drawerID in adc["drawer"].listDrawers():
@@ -257,6 +258,13 @@ def main():
             badge = screen.getInput("Badge to unlock: ")
             screen.showMessage("Unlock: " + adc["auth"].unlockAccount(session, badge))
 
+        elif choice == "13":        # This user's orders and requests, valid or not (FR-DSP-01)
+            result = adc["dispensing"].getUserOrders(session)
+            if result == "denied":
+                screen.showAlert("Access denied.")
+            else:
+                screen.showOrders(result["orders"], result["requests"])
+
         # ---------- Things outside the ADC that we make happen for the demo ----------
 
         elif choice == "20":        # Communication loss (Scenario 4: FR-COM-01)
@@ -271,7 +279,8 @@ def main():
             patientID = screen.getInput("Patient ID: ")
             drugID = screen.getInput("Drug ID: ")
             dose = screen.getNumber("Dose (mg): ")
-            monitoring.sendOrder(orderID, patientID, drugID, dose)
+            expiry = screen.getInput("Order expires (YYYY-MM-DD): ")
+            monitoring.sendOrder(orderID, patientID, drugID, dose, expiry)
 
         elif choice == "23":        # The Monitoring System tells the cabinet to shut down
             monitoring.sendCommand("SHUTDOWN")

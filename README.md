@@ -20,6 +20,7 @@ Every start resets the cabinet, so the demo always begins the same way.
 - **The bottom bar** is where you answer questions: type and press Enter, or click a purple button.
 - **The numbered buttons don't respond** while the bottom bar is waiting for an answer. Answer it first.
 - **Logging in** automatically logs out whoever was logged in before.
+- **A critical fault logs everyone out.** Log in again as the technician to fix it, or as the charge nurse for an override.
 
 ## Logins
 
@@ -45,6 +46,7 @@ Every start resets the cabinet, so the demo always begins the same way.
 | 10 - View logs | No | No | No | No | Yes |
 | 11 - Verify logs | No | No | No | No | Yes |
 | 12 - Unlock account | No | No | No | No | Yes |
+| 13 - My orders | Yes | Yes | No | No | No |
 
 A denied attempt is refused and flagged in the log.
 
@@ -67,9 +69,12 @@ The top bar shows the mode. Even with the right role, the mode can refuse an act
 | `P-1001` | `LORA` Lorazepam | `2` | D1 | 20 | |
 | `P-1001` | `ACET` Acetaminophen | `1000` | D2 | 30 | |
 | `P-1002` | `AMOX` Amoxicillin | `500` | D3 | 15 | |
-| `P-1002` | `MORP` Morphine | `10` | D4 | 5 | Always expired (batch 1050) |
+| `P-1002` | `MORP` Morphine | `10` | D4 | 5 | The medication is always expired (batch 1050) |
+| `P-1003` | `ACET` Acetaminophen | `1000` | D2 | Shares the 30 above | The order itself is always expired |
 
 Each order can only be dispensed once. Re-run the program to get them all back.
+
+Click **13 - My orders** at any time to see which orders are valid and why, plus everything the logged-in user has requested, allowed or refused.
 
 ## How we talk to the Monitoring System
 
@@ -113,6 +118,8 @@ FR-DSP-01, FR-DSP-02, NFR-AUT-01, NFR-AUT-04. Every drawer stays locked.
 | **3 - Dispense**: `P-1002`, `MORP`, `10` | "batch 1050 is expired" |
 | **3 - Dispense**: `P-1001`, `LORA`, `2` | "already been dispensed" |
 | **3 - Dispense**: `P-1001`, `AMOX`, `500` | "no authorized order" |
+| **3 - Dispense**: `P-1003`, `ACET`, `1000` | "This order expired on 2020-01-01" |
+| **13 - My orders** | Each order with valid or why not, and "Your requests" lists your dispense from Demo 1 as allowed, plus all five of these attempts with the reason each was refused |
 | **5 - Emergency override**: `ACET`, `CODE_BLUE` | "You are not authorized to override" |
 | **4 - Restock**: `LORA`, `2000`, `2099-01-01`, `10` | "you may not restock" |
 
@@ -123,8 +130,8 @@ Handout scenario 3. FR-ALM-01, FR-ALM-02, FR-COM-02, NFR-FD-01, NFR-FD-02, US-FD
 | Do this | You should see |
 |---|---|
 | **3 - Dispense**: `P-1002`, `AMOX`, `500` | D3 is unlocked |
-| **Take dose, leave drawer open** | Top bar turns red, SAFE STATE, D3 is OPEN, F-1 is listed, "Dispense NOT confirmed". Activity shows `malfunction` and `maintenance_request`, each with `SENT` |
-| **3 - Dispense**: `P-1001`, `ACET`, `1000` | "not permitted in the current mode" |
+| **Take dose, leave drawer open** | Top bar turns red, SAFE STATE, D3 is OPEN, F-1 is listed, "Dispense NOT confirmed", and the nurse is logged out. Activity shows `malfunction` and `maintenance_request`, each with `SENT` |
+| **1 - Log in**: `N001`, `1111`, then **3 - Dispense**: `P-1001`, `ACET`, `1000` | "not permitted in the current mode" |
 | **1 - Log in**: `T001`, `4444` | User: Tom Reid (TECHNICIAN) |
 | **7 - Resolve fault**: `F-1` | "Resolve: rejected", because it isn't fixed yet |
 | **28 - Repair all** | D3 is LOCKED, still SAFE STATE |
@@ -187,18 +194,18 @@ US-STAT-01.
 
 ### Demo 8: Other hardware faults (Technician)
 
-FR-ALM-02, NFR-FD-01, NFR-FD-02. Stay logged in as the technician, except for the jammed lock.
+FR-ALM-02, NFR-FD-01, NFR-FD-02. Each critical fault logs you out, so you log in again to fix it.
 
 | Do this | You should see |
 |---|---|
-| **25 - Break a lock**: `D2` | SAFE STATE, D2 is UNKNOWN, F-2 is listed |
-| **28 - Repair all**, then **7 - Resolve fault**: `F-2`, then **8 - Resume normal** | Back to Operational |
-| **26 - Break a sensor**: `D3` | SAFE STATE, D3 is UNKNOWN, F-3 is listed |
-| **28 - Repair all**, then **7 - Resolve fault**: `F-3`, then **8 - Resume normal** | Back to Operational |
-| **27 - Power failure** | F-4 MAJOR is listed, but it stays Operational. Activity shows `"malfunction_type": "electrical"` with `SENT` |
+| **25 - Break a lock**: `D2` | SAFE STATE, D2 is UNKNOWN, F-2 is listed, not logged in |
+| **1 - Log in**: `T001`, `4444`, then **28 - Repair all**, then **7 - Resolve fault**: `F-2`, then **8 - Resume normal** | Back to Operational |
+| **26 - Break a sensor**: `D3` | SAFE STATE, D3 is UNKNOWN, F-3 is listed, not logged in |
+| **1 - Log in**: `T001`, `4444`, then **28 - Repair all**, then **7 - Resolve fault**: `F-3`, then **8 - Resume normal** | Back to Operational |
+| **27 - Power failure** | F-4 MAJOR is listed, but it stays Operational and you stay logged in. Activity shows `"malfunction_type": "electrical"` with `SENT` |
 | **28 - Repair all**, then **7 - Resolve fault**: `F-4` | F-4 is gone |
 | **1 - Log in**: `N001`, `1111`, then **3 - Dispense**: `P-1001`, `ACET`, `1000` | D2 is unlocked |
-| **Take dose and close, but the lock jams** | SAFE STATE, D2 is UNLOCKED, F-5 LOCK_FAILURE is listed |
+| **Take dose and close, but the lock jams** | SAFE STATE, D2 is UNLOCKED, F-5 LOCK_FAILURE is listed, not logged in |
 | **1 - Log in**: `T001`, `4444`, then **28 - Repair all**, then **7 - Resolve fault**: `F-5`, then **8 - Resume normal** | Back to Operational |
 
 If the jammed lock stays unfixed for more than 30 seconds, a second fault (F-6) appears by itself. Resolve it too before resuming.
@@ -210,7 +217,7 @@ NFR-AUT-02, US-AUT-01, US-AUT-04.
 | Do this | You should see |
 |---|---|
 | **1 - Log in**: `N001`, `1111` | User: Nina Patel (NURSE) |
-| **29 - Skip 3 minutes** | "Session ended after 3 minutes of inactivity", not logged in |
+| **29 - Skip 3 minutes** | "Session ended", not logged in |
 | **1 - Log in**: `N001`, `0000`, three times | "Invalid credentials" each time |
 | **1 - Log in**: `N001`, `0000`, a fourth time | "Account Temporarily Locked" |
 | **1 - Log in**: `N001`, `1111` | Still locked, even with the right PIN. This 5th attempt also flags a breach in the log |
@@ -223,7 +230,7 @@ FR-DSP-01.
 
 | Do this | You should see |
 |---|---|
-| **22 - New order**: `O9`, `P-2000`, `AMOX`, `500` | Nothing yet. It's picked up at the next dispense |
+| **22 - New order**: `O9`, `P-2000`, `AMOX`, `500`, `2099-12-31` | Nothing yet. It's picked up at the next dispense or **13 - My orders** |
 | **3 - Dispense**: `P-2000`, `AMOX`, `500`, then **Take dose and close** | "Dispense complete", so the new order worked |
 
 ### Demo 11: Freeze command from the Monitoring System
@@ -269,6 +276,7 @@ New requirement.
 | "Access denied" or "you may not" | Wrong role for that action. Check the "Who can do what" table |
 | "not permitted in the current mode" | The mode is refusing it. Check the top bar |
 | "Resume: rejected" | Log in as the technician, click **28 - Repair all**, resolve every listed fault, then resume |
+| Suddenly logged out | 3 minutes of inactivity, or a critical fault. Log in again |
 | FROZEN won't go away | Only **30 - Restart software** clears it |
 
 ## Say these before a TA finds them

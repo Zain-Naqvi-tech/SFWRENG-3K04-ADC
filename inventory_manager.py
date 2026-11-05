@@ -83,6 +83,7 @@ class InventoryManager:
 
     def removeMedication(self, drugID, amount):
         """
+        This is updateInventory(m, q, DISPENSE) from our precise specification.
         PRE:  the removal was physically confirmed by the caller.
         POST: "allowed"  - the quantity is reduced, saved and logged.
               "rejected" - unknown drug, invalid amount, or not enough stock. Nothing changes.
@@ -182,9 +183,12 @@ class InventoryManager:
             return "Amount must be a positive whole number."
         if len(expiryDate) != 10 or expiryDate[4] != "-" or expiryDate[7] != "-":
             return "Expiry date must be YYYY-MM-DD."
+        if existing != None and existing["expiry"] != expiryDate:
+            return "That batch already has expiry date " + existing["expiry"] + "."     # a lot's expiry never changes
         return ""
 
     def __addMedication(self, user, drugID, batchID, amount, expiryDate):
+        # This is updateInventory(m, q, RESTOCK) from our precise specification.
         # Private, so stock can only be added after authorization and sensor confirmation.
         batch = self.__findBatch(batchID)
         if batch == None:

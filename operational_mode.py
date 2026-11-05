@@ -9,6 +9,7 @@ EXPORTED OPERATIONS: getCurrentMode, setMode, enterSafeState, checkOperationAllo
 USES: Authenticator, EventLogger.
 
 This is our D1 state machine at the cabinet level. Every transition is one line in __ALLOWED_CHANGES.
+The SAFE mode here is "systemMode = Fault" in handleFault() in our precise specification.
 Fault Monitor uses this module, so this module cannot call Fault Monitor. That is why the
 hardware verdict is passed in as a parameter.
 """

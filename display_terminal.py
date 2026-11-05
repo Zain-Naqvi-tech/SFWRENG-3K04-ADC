@@ -7,7 +7,7 @@ It has the same interface as display.py, so nothing else changes. That is the an
 RESPONSIBILITY: Show ADC information and collect user input.
 SECRET: How information is laid out and how input is collected. Other modules do not know it is a terminal.
 ANTICIPATED CHANGE: The screen is replaced or the wording changes. Only this file changes.
-EXPORTED OPERATIONS: showStatus, showMenu, showMessage, showAlert, showInventory, showEvents,
+EXPORTED OPERATIONS: showStatus, showMenu, showMessage, showAlert, showInventory, showEvents, showOrders,
                      getInput, getNumber, getChoice, promptCredentials
 USES: nothing. main.py passes it the information to show, so it can never change another module's data.
 """
@@ -47,6 +47,7 @@ class Display:
         print("[7 - Resolve fault] FR-COM-02         [8 - Resume normal] US-FD-02")
         print("[9 - Maintenance on/off] US-STAT-01   [10 - View logs] FR-LOG-01")
         print("[11 - Verify logs] NFR-AUT-03         [12 - Unlock account] US-AUT-01")
+        print("[13 - My orders] FR-DSP-01")
         print(" ")
         print("--- Make something happen (for the demo) ---")
         print(" ")
@@ -77,6 +78,17 @@ class Display:
         """Shows log events with their time."""
         for event in events:
             print(" ", event["seq"], self.__formatTime(event["time"]), event["type"], event["user"], event["details"])
+
+    def showOrders(self, orders, requests):
+        """Shows every order with whether it is valid, then what this user has requested, valid or not."""
+        print("Orders:")
+        for order in orders:
+            print(" ", order["orderID"], order["patientID"], order["drugID"], order["dose"], "| expires", order["expiry"], "|", order["validity"])
+        print("Your requests:")
+        if len(requests) == 0:
+            print("  No requests yet.")
+        for request in requests:
+            print(" ", request["patientID"], request["drugID"], request["dose"], "|", request["verdict"], request["reason"])
 
     def getInput(self, prompt):
         """Returns what the user typed, without extra spaces."""

@@ -5,7 +5,7 @@ RESPONSIBILITY: Show ADC information and collect user input.
 SECRET: How information is laid out and how input is collected. Other modules do not know it is a window.
 ANTICIPATED CHANGE: The screen is replaced or the wording changes. Only this file changes.
                     display_terminal.py has the same interface: change one import in main.py to use it.
-EXPORTED OPERATIONS: showStatus, showMenu, showMessage, showAlert, showInventory, showEvents,
+EXPORTED OPERATIONS: showStatus, showMenu, showMessage, showAlert, showInventory, showEvents, showOrders,
                      getInput, getNumber, getChoice, promptCredentials
 USES: nothing. main.py passes it the information to show, so it can never change another module's data.
 """
@@ -42,6 +42,7 @@ class Display:
         "7": "Resolve fault\nFR-COM-02", "8": "Resume normal\nUS-FD-02",
         "9": "Maintenance on/off\nUS-STAT-01", "10": "View logs\nFR-LOG-01",
         "11": "Verify logs\nNFR-AUT-03", "12": "Unlock account\nUS-AUT-01",
+        "13": "My orders\nFR-DSP-01",
     }
     __DEMO_ACTIONS = {
         "20": "Network down/up\nFR-COM-01", "21": "Monitoring: Freeze\nNew requirement",
@@ -141,6 +142,27 @@ class Display:
             self.__write(line, "normal")
         self.__write("\n", "normal")
 
+    def showOrders(self, orders, requests):
+        """Shows every order with whether it is valid, then what this user has requested, valid or not."""
+        self.__write("\nORDER  PATIENT  DRUG  DOSE  EXPIRES     VALID?\n", "heading")
+        for order in orders:
+            line = order["orderID"].ljust(7) + order["patientID"].ljust(9) + order["drugID"].ljust(6)
+            line = line + str(order["dose"]).ljust(6) + order["expiry"].ljust(12) + order["validity"] + "\n"
+            if order["validity"] == "valid":
+                self.__write(line, "normal")
+            else:
+                self.__write(line, "alert")
+        self.__write("\nYOUR REQUESTS\nPATIENT  DRUG  DOSE  RESULT\n", "heading")
+        if len(requests) == 0:
+            self.__write("No requests yet.\n", "normal")
+        for request in requests:
+            line = request["patientID"].ljust(9) + request["drugID"].ljust(6) + str(request["dose"]).ljust(6) + request["verdict"]
+            if request["verdict"] == "allowed":
+                self.__write(line + "\n", "normal")
+            else:
+                self.__write(line + " - " + request["reason"] + "\n", "alert")
+        self.__write("\n", "normal")
+
     def getInput(self, prompt):
         """Returns the menu button clicked if showMenu was just called, or "" if a second passes with
         no click, so the loop in main.py keeps running. Otherwise returns what the user typed."""
@@ -179,7 +201,7 @@ class Display:
 
     def __buildBanner(self):
         # Row 0, the top bar: its colour shows the mode at a glance (US-STAT-01).
-        self.__banner = tk.Frame(self.__window, padx=18, pady=10)
+        self.__banner = tk.Frame(self.__window, padx=18, pady=4)
         self.__banner.grid(row=0, column=0, columnspan=2, sticky="ew")
         self.__banner.columnconfigure(0, weight=1)
         self.__modeLabel = tk.Label(self.__banner, fg="white", font=("Segoe UI", 20, "bold"))
@@ -193,11 +215,11 @@ class Display:
 
     def __buildDrawerRow(self):
         # Row 1: one card per drawer. The cards are added by showStatus.
-        self.__drawerRow = tk.Frame(self.__window, bg=self.__BACKGROUND, padx=12, pady=8)
+        self.__drawerRow = tk.Frame(self.__window, bg=self.__BACKGROUND, padx=12, pady=4)
         self.__drawerRow.grid(row=1, column=0, columnspan=2, sticky="ew")
 
     def __addDrawerCard(self, drawerID):
-        frame = tk.Frame(self.__drawerRow, padx=10, pady=6)
+        frame = tk.Frame(self.__drawerRow, padx=10, pady=2)
         frame.pack(side="left", padx=6, expand=True, fill="x")
         name = tk.Label(frame, text="Drawer " + drawerID, fg="white", font=("Segoe UI", 10))
         name.pack()
@@ -220,7 +242,7 @@ class Display:
 
     def __buildButtons(self):
         # Row 3, left side: what a user does, then what we make happen for the demo.
-        panel = tk.Frame(self.__window, bg=self.__BACKGROUND, padx=12, pady=8)
+        panel = tk.Frame(self.__window, bg=self.__BACKGROUND, padx=12, pady=2)
         panel.grid(row=3, column=0, sticky="ns")
         self.__addButtonGroup(panel, "At the cabinet", self.__USER_ACTIONS, self.__USER_BUTTON)
         self.__addButtonGroup(panel, "Make something happen (for the demo)", self.__DEMO_ACTIONS, self.__DEMO_BUTTON)
@@ -263,7 +285,7 @@ class Display:
 
     def __buildInputBar(self):
         # Row 4: where the user answers a question, by typing or by clicking a choice.
-        bar = tk.Frame(self.__window, bg="white", padx=14, pady=10)
+        bar = tk.Frame(self.__window, bg="white", padx=14, pady=5)
         bar.grid(row=4, column=0, columnspan=2, sticky="ew")
         self.__promptLabel = tk.Label(bar, bg="white", font=("Segoe UI", 11, "bold"))
         self.__promptLabel.pack(side="left", padx=(0, 10))

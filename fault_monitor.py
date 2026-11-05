@@ -76,14 +76,15 @@ class FaultMonitor:
 
     def reportFault(self, faultType, component, description):
         """
+        This is handleFault() from our precise specification.
         PRE:  faultType is one of DRAWER_NOT_SECURED, LOCK_FAILURE, HARDWARE_UNRESPONSIVE,
               INVENTORY_CORRUPT or POWER_FAILURE.
         POST: "success"  - recorded once and logged, alarm and maintenance request sent
-                           (FR-ALM-01, FR-ALM-02). A CRITICAL fault enters the safe state and locks
-                           every drawer that can lock (NFR-FD-01).
-              "rejected" - unknown fault type. Nothing changes.
+                           (FR-ALM-01, FR-ALM-02). A CRITICAL fault enters the safe state, ends every
+                           session, and locks every drawer that can lock (NFR-FD-01).
+              "rejected" - unknown fault type, or the fault information is incomplete. Nothing changes.
         """
-        if faultType not in self.__FAULT_TYPES:
+        if faultType not in self.__FAULT_TYPES or component == "" or description == "":
             return "rejected"
         for faultID in self.__faults:
             fault = self.__faults[faultID]
@@ -105,6 +106,7 @@ class FaultMonitor:
         self.__transmission.sendMessage("MAINTENANCE_REQUEST", fault)
         if fault["severity"] == "CRITICAL":
             self.__mode.enterSafeState(faultID)
+            self.__auth.endAllSessions()
             self.__lockAllDrawers()
         return "success"
 

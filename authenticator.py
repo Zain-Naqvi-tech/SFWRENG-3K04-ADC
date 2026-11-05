@@ -4,7 +4,7 @@ AUTHENTICATOR MODULE
 RESPONSIBILITY: Verify who a user is and what they may do, within a valid session.
 SECRET: How credentials are verified, who the users are, and how sessions are tracked.
 ANTICIPATED CHANGE: PIN replaced by biometrics or access cards. Only __checkCredentials changes.
-EXPORTED OPERATIONS: authenticate, getUserIdentity, logout, isAuthorized, unlockAccount
+EXPORTED OPERATIONS: authenticate, getUserIdentity, logout, isAuthorized, unlockAccount, endAllSessions
 USES: EventLogger, Clock.
 
 REQ from our 4-variable model: c_accessGranted = valid session AND m_requestedOperation is in
@@ -101,6 +101,7 @@ class Authenticator:
 
     def isAuthorized(self, sessionId, action):
         """
+        This is requestAccess() from our precise specification.
         PRE:  none.
         POST: True  - the session is valid and the role permits the action. The inactivity timer resets.
               False - otherwise, and the request is logged and flagged (NFR-AUT-04).
@@ -129,6 +130,16 @@ class Authenticator:
         self.__failedAttempts[badge] = 0
         self.__logger.logEvent("ACCOUNT_UNLOCKED", self.__sessions[sessionId]["badge"], badge)
         return "success"
+
+    def endAllSessions(self):
+        """
+        PRE:  Fault Monitor found a critical fault.
+        POST: every session is ended and logged (handleFault: c_sessionActive = False,
+              o_sessionControl = Terminate). Staff can log in again for recovery or an override.
+        """
+        for sessionId in self.__sessions:
+            self.__logger.logEvent("SESSION_TERMINATED", self.__sessions[sessionId]["badge"], "critical fault")
+        self.__sessions = {}
 
     # ================ PRIVATE (the secret: how we verify people and track sessions) ================
 

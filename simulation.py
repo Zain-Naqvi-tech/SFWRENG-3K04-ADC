@@ -147,10 +147,11 @@ class MonitoringSystem:
         self.__ordersToSend = []
         self.__commandsToSend = []
         # The pharmacy's authorized orders. These reach the ADC through Transmission.
-        self.sendOrder("O1", "P-1001", "LORA", 2)
-        self.sendOrder("O2", "P-1001", "ACET", 1000)
-        self.sendOrder("O3", "P-1002", "AMOX", 500)
-        self.sendOrder("O4", "P-1002", "MORP", 10)
+        self.sendOrder("O1", "P-1001", "LORA", 2, "2099-12-31")
+        self.sendOrder("O2", "P-1001", "ACET", 1000, "2099-12-31")
+        self.sendOrder("O3", "P-1002", "AMOX", 500, "2099-12-31")
+        self.sendOrder("O4", "P-1002", "MORP", 10, "2099-12-31")
+        self.sendOrder("O5", "P-1003", "ACET", 1000, "2020-01-01")      # this order has expired
 
     # ----- Called by Transmission, across the system boundary. -----
 
@@ -176,8 +177,8 @@ class MonitoringSystem:
     def toggleLink(self):
         self.__online = not self.__online
 
-    def sendOrder(self, orderID, patientID, drugID, dose):
-        order = {"orderID": orderID, "patientID": patientID, "drugID": drugID, "dose": dose}
+    def sendOrder(self, orderID, patientID, drugID, dose, expiry):
+        order = {"orderID": orderID, "patientID": patientID, "drugID": drugID, "dose": dose, "expiry": expiry}
         self.__ordersToSend.append({"key": self.__SHARED_KEY, "content": order})
 
     def sendCommand(self, command):
