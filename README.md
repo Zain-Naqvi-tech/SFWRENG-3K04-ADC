@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ADC demo (Sub-team 78)
 
 Run from inside `adc_simple`:
@@ -152,3 +153,7 @@ After any change, update that requirement's row in the traceability table and re
 - Modes are plain strings in a transition table. Week 6 suggests an enum, which we skipped to keep it simple.
 - Python's `__private` blocks normal access, but `obj._Class__name` could still get in. No module does this.
 - The destructors print to the terminal that started the program, not to the window, so keep it visible if you want to show them on a restart.
+=======
+# SFWRENG-3K04-ADC
+Software implementation of and ADC (Automated Dispensing Cabinet) for use in hospital environments.
+>>>>>>> 9d4985100b75cddab2ff34cdae427ad56c073900
