@@ -1,0 +1,46 @@
+{
+ "LORA": {
+  "name": "Lorazepam",
+  "drawer": "D1",
+  "batches": [
+   {
+    "batch": "1010",
+    "quantity": 20,
+    "expiry": "2099-01-01"
+   }
+  ]
+ },
+ "ACET": {
+  "name": "Acetaminophen",
+  "drawer": "D2",
+  "batches": [
+   {
+    "batch": "1020",
+    "quantity": 30,
+    "expiry": "2099-01-01"
+   }
+  ]
+ },
+ "AMOX": {
+  "name": "Amoxicillin",
+  "drawer": "D3",
+  "batches": [
+   {
+    "batch": "1030",
+    "quantity": 15,
+    "expiry": "2099-01-01"
+   }
+  ]
+ },
+ "MORP": {
+  "name": "Morphine",
+  "drawer": "D4",
+  "batches": [
+   {
+    "batch": "1050",
+    "quantity": 5,
+    "expiry": "2020-01-01"
+   }
+  ]
+ }
+}

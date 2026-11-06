@@ -235,7 +235,7 @@ FR-DSP-01.
 
 ### Demo 11: Freeze command from the Monitoring System
 
-New requirement.
+FR-COM-03.
 
 | Do this | You should see |
 |---|---|
@@ -260,7 +260,7 @@ A corrupted inventory can't be fixed from the menu. Click **0 - Exit** and run `
 
 ### Demo 13: Shutdown command from the Monitoring System (after re-running)
 
-New requirement.
+FR-COM-04.
 
 | Do this | You should see |
 |---|---|

@@ -1,0 +1,84 @@
+[
+ {
+  "seq": 0,
+  "time": 1793981302.645357,
+  "type": "ORDER_RECEIVED",
+  "user": "SYSTEM",
+  "details": "O1",
+  "extra": {},
+  "sent": true,
+  "check": 986609024
+ },
+ {
+  "seq": 1,
+  "time": 1793981302.6599326,
+  "type": "ORDER_RECEIVED",
+  "user": "SYSTEM",
+  "details": "O2",
+  "extra": {},
+  "sent": true,
+  "check": 588198981
+ },
+ {
+  "seq": 2,
+  "time": 1793981302.6691525,
+  "type": "ORDER_RECEIVED",
+  "user": "SYSTEM",
+  "details": "O3",
+  "extra": {},
+  "sent": true,
+  "check": 323759093
+ },
+ {
+  "seq": 3,
+  "time": 1793981302.6808205,
+  "type": "ORDER_RECEIVED",
+  "user": "SYSTEM",
+  "details": "O4",
+  "extra": {},
+  "sent": true,
+  "check": 607270764
+ },
+ {
+  "seq": 4,
+  "time": 1793981302.6905153,
+  "type": "ORDER_RECEIVED",
+  "user": "SYSTEM",
+  "details": "O5",
+  "extra": {},
+  "sent": true,
+  "check": 441327073
+ },
+ {
+  "seq": 5,
+  "time": 1793981302.7012887,
+  "type": "MODE_CHANGED",
+  "user": "SYSTEM",
+  "details": "UNKNOWN -> NORMAL",
+  "extra": {
+   "mode": "NORMAL"
+  },
+  "sent": true,
+  "check": 67588430
+ },
+ {
+  "seq": 6,
+  "time": 1793982907.398576,
+  "type": "UNAUTHORIZED_REQUEST",
+  "user": "NO_SESSION",
+  "details": "DISPENSE",
+  "extra": {},
+  "sent": false,
+  "check": 642623274
+ },
+ {
+  "seq": 7,
+  "time": 1793982912.1665142,
+  "type": "UNAUTHORIZED_REQUEST",
+  "user": "NO_SESSION",
+  "details": "UNLOCK_ACCOUNT",
+  "extra": {},
+  "sent": false,
+  "check": 123809586
+ }
+]

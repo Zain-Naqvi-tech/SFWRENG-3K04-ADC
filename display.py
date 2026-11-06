@@ -45,8 +45,8 @@ class Display:
         "13": "My orders\nFR-DSP-01",
     }
     __DEMO_ACTIONS = {
-        "20": "Network down/up\nFR-COM-01", "21": "Monitoring: Freeze\nNew requirement",
-        "22": "New order\nFR-DSP-01", "23": "Monitoring: Shutdown\nNew requirement",
+        "20": "Network down/up\nFR-COM-01", "21": "Monitoring: Freeze\nFR-COM-03",
+        "22": "New order\nFR-DSP-01", "23": "Monitoring: Shutdown\nFR-COM-04",
         "24": "Skip 5 minutes\nFR-LOG-01", "25": "Break a lock\nFR-ALM-02, NFR-FD-01",
         "26": "Break a sensor\nFR-ALM-02, NFR-FD-01", "27": "Power failure\nFR-ALM-02, US-FD-01",
         "28": "Repair all\nUS-FD-02", "29": "Skip 3 minutes\nNFR-AUT-02",

@@ -1,0 +1,42 @@
+[
+ {
+  "orderID": "O1",
+  "patientID": "P-1001",
+  "drugID": "LORA",
+  "dose": 2,
+  "expiry": "2099-12-31",
+  "status": "ACTIVE"
+ },
+ {
+  "orderID": "O2",
+  "patientID": "P-1001",
+  "drugID": "ACET",
+  "dose": 1000,
+  "expiry": "2099-12-31",
+  "status": "ACTIVE"
+ },
+ {
+  "orderID": "O3",
+  "patientID": "P-1002",
+  "drugID": "AMOX",
+  "dose": 500,
+  "expiry": "2099-12-31",
+  "status": "ACTIVE"
+ },
+ {
+  "orderID": "O4",
+  "patientID": "P-1002",
+  "drugID": "MORP",
+  "dose": 10,
+  "expiry": "2099-12-31",
+  "status": "ACTIVE"
+ },
+ {
+  "orderID": "O5",
+  "patientID": "P-1003",
+  "drugID": "ACET",
+  "dose": 1000,
+  "expiry": "2020-01-01",
+  "status": "ACTIVE"
+ }
+]
