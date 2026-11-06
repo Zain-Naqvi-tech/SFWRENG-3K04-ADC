@@ -104,9 +104,9 @@ def main():
         # FR-ALM-01, NFR-COM-01: a fault is found here and its alarm is sent right away.
         adc["mode"].completeStartup(adc["faults"].checkHardwareStatus())
 
-        # Every hour, all logged events go to the Monitoring System. No reply comes back.
-        if adc["logger"].sendHourlyLog() == "sent":
-            screen.showMessage("--- Hourly log for the Monitoring System ---")
+        # Every 5 minutes, all logged events go to the Monitoring System. No reply comes back.
+        if adc["logger"].sendPeriodicLog() == "sent":
+            screen.showMessage("--- Periodic log for the Monitoring System ---")
 
         # Send anything still waiting (FR-COM-01), then show what went out.
         adc["transmission"].synchronizePendingMessages()
@@ -285,9 +285,9 @@ def main():
         elif choice == "23":        # The Monitoring System tells the cabinet to shut down
             monitoring.sendCommand("SHUTDOWN")
 
-        elif choice == "24":        # Hourly log without waiting an hour
-            clock.skip(3600)
-            screen.showMessage("1 hour has passed.")
+        elif choice == "24":        # Periodic log without waiting 5 minutes
+            clock.skip(300)
+            screen.showMessage("5 minutes have passed.")
 
         elif choice == "25":        # Hardware fault: a lock stops responding (Scenario 3)
             drawerID = screen.getInput("Drawer (D1-D4): ")

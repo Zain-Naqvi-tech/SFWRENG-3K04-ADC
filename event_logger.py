@@ -1,10 +1,10 @@
 """
 EVENTLOGGER MODULE
 
-RESPONSIBILITY: Keep a traceable history of ADC activity and send it to the Monitoring System every hour.
+RESPONSIBILITY: Keep a traceable history of ADC activity and send it to the Monitoring System on a schedule.
 SECRET: The log format, timestamps, the checksum that exposes tampering, and how often logs are sent.
 ANTICIPATED CHANGE: A better logging system, different log fields, or a different send interval. Only this file changes.
-EXPORTED OPERATIONS: logEvent, getEventHistory, getUserEvents, verifyLogIntegrity, sendHourlyLog
+EXPORTED OPERATIONS: logEvent, getEventHistory, getUserEvents, verifyLogIntegrity, sendPeriodicLog
 USES: Transmission, Storage, Clock.
 
 There is deliberately NO edit or delete operation (NFR-AUT-03). Records are never removed,
@@ -18,7 +18,7 @@ class EventLogger:
     """STATE INVARIANT: each saved record's checksum includes the checksum of the record before it,
     and each record is sent to the Monitoring System only once."""
 
-    __SEND_INTERVAL_SECONDS = 3600      # every hour
+    __SEND_INTERVAL_SECONDS = 300       # every 5 minutes, as agreed with the Monitoring team
 
     def __init__(self, transmission, clock, storage):
         self.__transmission = transmission
@@ -35,7 +35,7 @@ class EventLogger:
     def logEvent(self, eventType, user, details, extra=None):
         """
         PRE:  extra, if given, holds any of: "mode", "drawer", "drug", "batch", "amount", "expiry".
-        POST: "success"  - saved locally with a timestamp, and sent with the next hourly log (FR-LOG-01).
+        POST: "success"  - saved locally with a timestamp, and sent with the next periodic log (FR-LOG-01).
               "rejected" - the event has no type. Nothing changes.
         """
         if eventType == "":
@@ -53,11 +53,11 @@ class EventLogger:
         self.__storage.save("log", records)
         return "success"
 
-    def sendHourlyLog(self):
+    def sendPeriodicLog(self):
         """
         PRE:  none.
-        POST: "sent"    - an hour has passed, and every event not sent yet went to Transmission.
-              "not_due" - less than an hour has passed. Nothing changes.
+        POST: "sent"    - 5 minutes have passed, and every event not sent yet went to Transmission.
+              "not_due" - less than 5 minutes have passed. Nothing changes.
         """
         if self.__clock.now() - self.__lastSendTime < self.__SEND_INTERVAL_SECONDS:
             return "not_due"
@@ -102,7 +102,7 @@ class EventLogger:
         PRE:  none.
         POST: "valid"   - every record matches its checksum.
               "invalid" - at least one does not. The bad records are flagged in a new
-                          event, which goes out with the next hourly log (US-LOG-02).
+                          event, which goes out with the next periodic log (US-LOG-02).
         """
         badRecords = []
         previousCheck = 0

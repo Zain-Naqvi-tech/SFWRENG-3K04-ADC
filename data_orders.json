@@ -5,7 +5,7 @@
   "drugID": "LORA",
   "dose": 2,
   "expiry": "2099-12-31",
-  "status": "ACTIVE"
+  "status": "DISPENSED"
  },
  {
   "orderID": "O2",
@@ -21,7 +21,7 @@
   "drugID": "AMOX",
   "dose": 500,
   "expiry": "2099-12-31",
-  "status": "ACTIVE"
+  "status": "DISPENSED"
  },
  {
   "orderID": "O4",

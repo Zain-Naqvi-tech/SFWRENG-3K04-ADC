@@ -80,7 +80,7 @@ Click **13 - My orders** at any time to see which orders are valid and why, plus
 
 | What | When | Reply from them? |
 |---|---|---|
-| Every logged event, including all attempts | Every hour | None |
+| Every logged event, including all attempts | Every 5 minutes | None |
 | Malfunction and maintenance request | As soon as the fault is found | None |
 | Malfunction resolved | As soon as it's verified | None |
 | Authorized orders, from them to us | When they send one | None |
@@ -105,7 +105,7 @@ Handout scenario 1. FR-AUTH-01, FR-DSP-01, FR-LOG-01.
 | **3 - Dispense**: `P-1001`, `LORA`, `2` | "drawer D1 is unlocked", and purple buttons appear |
 | **Take dose and close** | "Dispense complete", and D1 is LOCKED |
 | **6 - View inventory** | LORA quantity went from 20 to 19 |
-| **24 - Skip 1 hour** | "Hourly log", then each event in their format with `SENT`, including `dispense_completed`. The session also ends, since an hour passed |
+| **24 - Skip 5 minutes** | "Periodic log", then each event in their format with `SENT`, including `dispense_completed`. The session also ends, since 5 minutes is past the 3-minute timeout |
 
 ### Demo 2: Requests that get refused (Nurse)
 
@@ -149,7 +149,7 @@ Handout scenarios 2 and 4. FR-COM-01, NFR-FD-03, US-INV-01.
 | **1 - Log in**: `P001`, `3333` | User: Priya Shah (PHARMACIST) |
 | **4 - Restock**: `LORA`, `2000`, `2099-01-01`, `10` | "count increased by 10", "Saved locally" |
 | **6 - View inventory** | LORA now also has batch 2000 with quantity 10 |
-| **24 - Skip 1 hour** | "Hourly log", but nothing says `SENT`. Messages waiting goes above 0 |
+| **24 - Skip 5 minutes** | "Periodic log", but nothing says `SENT`. Messages waiting goes above 0 |
 | **20 - Network down/up** | Monitoring: connected, 0 messages waiting, and the waiting events appear with `SENT`, including `restock` |
 
 ### Demo 5: Emergency override (Charge nurse)
@@ -278,6 +278,7 @@ New requirement.
 | "Resume: rejected" | Log in as the technician, click **28 - Repair all**, resolve every listed fault, then resume |
 | Suddenly logged out | 3 minutes of inactivity, or a critical fault. Log in again |
 | FROZEN won't go away | Only **30 - Restart software** clears it |
+| "Periodic log" and a block of `SENT` messages appear by themselves | Normal. The log goes out every 5 real minutes while the window is open, so it can happen during a demo |
 
 ## Say these before a TA finds them
 
@@ -285,7 +286,7 @@ New requirement.
 - The cabinet hardware is simulated, in `simulation.py`.
 - A shared key stands in for the authenticated, encrypted connection, so there's no real encryption (NFR-COM-02).
 - PINs are stored as plain text.
-- The hourly log and fault checks run on a timer only in the window. The terminal version waits for you to press Enter.
+- The 5-minute log and fault checks run on a timer only in the window. The terminal version waits for you to press Enter.
 
 ## Using the terminal instead
 

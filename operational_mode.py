@@ -106,7 +106,8 @@ class OperationalMode:
             return "rejected"
         if self.__auth.isAuthorized(sessionId, "RESOLVE_FAULT") == False:
             return "rejected"
-        self.__changeMode("NORMAL")
+        if self.__changeMode("NORMAL") != "success":
+            return "rejected"
         return "normal_mode"
 
     def completeStartup(self, hardwareStatus):

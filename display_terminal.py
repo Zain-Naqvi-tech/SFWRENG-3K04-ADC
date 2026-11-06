@@ -35,6 +35,8 @@ class Display:
         print("Monitoring:", connection, "|", pending, "messages waiting | User:", user)
         for drawerID in drawers:
             print("  Drawer", drawerID, "-", drawers[drawerID])
+        if len(faults) == 0:
+            print("  No active faults")
         for fault in faults:
             print("  FAULT", fault["id"], fault["severity"], fault["faultType"], "on", fault["component"], "-", fault["description"])
 
@@ -53,7 +55,7 @@ class Display:
         print(" ")
         print("[20 - Network down/up] FR-COM-01      [21 - Monitoring: Freeze] New requirement")
         print("[22 - New order] FR-DSP-01            [23 - Monitoring: Shutdown] New requirement")
-        print("[24 - Skip 1 hour] FR-LOG-01          [25 - Break a lock] FR-ALM-02")
+        print("[24 - Skip 5 minutes] FR-LOG-01       [25 - Break a lock] FR-ALM-02")
         print("[26 - Break a sensor] FR-ALM-02       [27 - Power failure] FR-ALM-02, US-FD-01")
         print("[28 - Repair all] US-FD-02            [29 - Skip 3 minutes] NFR-AUT-02")
         print("[30 - Restart software] NFR-FD-03     [31 - Corrupt inventory] US-FD-03")

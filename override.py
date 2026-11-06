@@ -10,7 +10,7 @@ USES: Authenticator, Dispensing, EventLogger. It never touches hardware: Dispens
 
 
 class Override:
-    """STATE INVARIANT: holds no override state, so approval only lasts as long as the session."""
+    """STATE INVARIANT: holds no override state, so an approval never outlasts the request that asked for it."""
 
     __APPROVED_REASONS = ["CODE_BLUE", "RAPID_RESPONSE", "ADC_MALFUNCTION"]
 

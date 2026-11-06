@@ -9,7 +9,7 @@ EXPORTED OPERATIONS: sendMessage, receiveMessage, receiveCommand, checkConnectio
 USES: the network link (MonitoringSystem), Storage, Clock.
 
 EXTERNAL INTERFACE with the Monitoring System:
-  PROVIDES: every logged event, sent hourly. Malfunctions, maintenance requests and resolved
+  PROVIDES: every logged event, sent every 5 minutes. Malfunctions, maintenance requests and resolved
             malfunctions, sent as soon as they happen. There is no reply to any of these.
   REQUIRES: authorized orders, and FREEZE or SHUTDOWN commands.
   LINK DOWN: the ADC keeps working. Messages wait in the saved queue and are sent when the

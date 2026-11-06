@@ -91,7 +91,7 @@ class Authenticator:
         """
         PRE:  none.
         POST: "success" - the session is ended and logged.
-              "failure" - the session is invalid or already expired. Nothing changes.
+              "failure" - the session is invalid or expired. An expired session is removed and logged.
         """
         if self.__validateSession(sessionId) != "valid":
             return "failure"
